@@ -11,6 +11,7 @@ struct SettingsView: View {
   @State private var openClawGatewayToken: String = ""
   @State private var geminiSystemPrompt: String = ""
   @State private var webrtcSignalingURL: String = ""
+  @State private var speakerOutputEnabled: Bool = false
   @State private var showResetConfirmation = false
 
   var body: some View {
@@ -89,6 +90,10 @@ struct SettingsView: View {
           }
         }
 
+        Section(header: Text("Audio"), footer: Text("Route audio output to the iPhone speaker instead of glasses. Useful for demos where others need to hear.")) {
+          Toggle("Speaker Output", isOn: $speakerOutputEnabled)
+        }
+
         Section {
           Button("Reset to Defaults") {
             showResetConfirmation = true
@@ -135,6 +140,7 @@ struct SettingsView: View {
     openClawHookToken = settings.openClawHookToken
     openClawGatewayToken = settings.openClawGatewayToken
     webrtcSignalingURL = settings.webrtcSignalingURL
+    speakerOutputEnabled = settings.speakerOutputEnabled
   }
 
   private func save() {
@@ -147,5 +153,6 @@ struct SettingsView: View {
     settings.openClawHookToken = openClawHookToken.trimmingCharacters(in: .whitespacesAndNewlines)
     settings.openClawGatewayToken = openClawGatewayToken.trimmingCharacters(in: .whitespacesAndNewlines)
     settings.webrtcSignalingURL = webrtcSignalingURL.trimmingCharacters(in: .whitespacesAndNewlines)
+    settings.speakerOutputEnabled = speakerOutputEnabled
   }
 }

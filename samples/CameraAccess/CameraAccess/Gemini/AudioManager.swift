@@ -38,6 +38,7 @@ class AudioManager {
     let session = AVAudioSession.sharedInstance()
     // iPhone mode: voiceChat for aggressive echo cancellation (mic + speaker co-located)
     // Glasses mode: allowBluetoothHFP + mixWithOthers for background streaming support
+    // When speaker output enabled, audio routes to iPhone speaker (for demos)
     if useIPhoneMode {
       try session.setCategory(
         .playAndRecord,
@@ -54,6 +55,10 @@ class AudioManager {
     try session.setPreferredSampleRate(GeminiConfig.inputAudioSampleRate)
     try session.setPreferredIOBufferDuration(0.064)
     try session.setActive(true)
+    if SettingsManager.shared.speakerOutputEnabled {
+      try session.overrideOutputAudioPort(.speaker)
+      NSLog("[Audio] Speaker output override: ON (iPhone speaker)")
+    }
     NSLog("[Audio] Session mode: %@", useIPhoneMode ? "voiceChat (iPhone)" : "videoChat (glasses)")
 
     setupInterruptionHandling()
