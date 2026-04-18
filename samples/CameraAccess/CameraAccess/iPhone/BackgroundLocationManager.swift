@@ -46,6 +46,9 @@ class BackgroundLocationManager: NSObject, ObservableObject {
         locationManager.pausesLocationUpdatesAutomatically = false
         
         authorizationStatus = locationManager.authorizationStatus
+        
+        // Register background task handler BEFORE app finishes launching
+        registerBackgroundTask()
     }
     
     /// Request "Always" location permission for background updates
@@ -56,7 +59,7 @@ class BackgroundLocationManager: NSObject, ObservableObject {
     /// Start monitoring significant location changes (works in background)
     func startBackgroundUpdates() {
         locationManager.startMonitoringSignificantLocationChanges()
-        registerBackgroundTask()
+        scheduleBackgroundTask()
         NSLog("[BackgroundLocation] Started significant location monitoring")
     }
     
@@ -108,7 +111,7 @@ class BackgroundLocationManager: NSObject, ObservableObject {
             return
         }
         
-        guard let url = URL(string: "\(openClawHost):\(openClawPort)/v1/location") else {
+        guard let url = URL(string: "\(openClawHost):18791/location") else {
             NSLog("[BackgroundLocation] Invalid OpenClaw URL")
             return
         }

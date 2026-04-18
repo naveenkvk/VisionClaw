@@ -71,7 +71,7 @@ class OpenClawBridge: ObservableObject {
   // MARK: - LinkedIn Profile Finder
   
   /// Check if task is a LinkedIn search request and handle it
-  private func handleLinkedInRequest(_ task: String) -> ToolResult? {
+    private func handleLinkedInRequest(_ task: String) async -> ToolResult? {
     let lowerTask = task.lowercased()
     
     // Check for LinkedIn-related keywords
@@ -91,6 +91,8 @@ class OpenClawBridge: ObservableObject {
     
     guard isLinkedInRequest else { return nil }
     
+    let trimSet = CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters)
+
     // Extract name - remove common keywords
     var name = task
       .replacingOccurrences(of: "find linkedin for", with: "", options: .caseInsensitive)
@@ -102,7 +104,7 @@ class OpenClawBridge: ObservableObject {
       .replacingOccurrences(of: "linkedin for", with: "", options: .caseInsensitive)
       .replacingOccurrences(of: "linkedin", with: "", options: .caseInsensitive)
       .replacingOccurrences(of: "profile", with: "", options: .caseInsensitive)
-      .trimmingCharacters(in: .whitespacesAndPunctuation)
+      .trimmingCharacters(in: trimSet)
     
     guard !name.isEmpty else { return nil }
     
@@ -114,7 +116,7 @@ class OpenClawBridge: ObservableObject {
   
   /// Call the LinkedIn finder skill directly
   private func callLinkedInFinder(name: String) async -> ToolResult {
-    guard let url = URL(string: "\(GeminiConfig.openClawHost):\(GeminiConfig.openClawPort)/skill/linkedin-finder") else {
+    guard let url = URL(string: "\(GeminiConfig.openClawHost):5002/skill/linkedin-finder") else {
       return .failure("Invalid skill URL")
     }
     
