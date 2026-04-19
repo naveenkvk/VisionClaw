@@ -154,6 +154,13 @@ class GeminiLiveService: ObservableObject {
     }
   }
 
+  func sendClientContent(_ content: [String: Any]) {
+    guard connectionState == .ready else { return }
+    sendQueue.async { [weak self] in
+      self?.sendJSON(["clientContent": content])
+    }
+  }
+
   // MARK: - Private
 
   private func resolveConnect(success: Bool) {
