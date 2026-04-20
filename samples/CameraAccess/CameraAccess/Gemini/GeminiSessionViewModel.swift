@@ -12,8 +12,10 @@ class GeminiSessionViewModel: ObservableObject {
   @Published var toolCallStatus: ToolCallStatus = .idle
   @Published var openClawConnectionState: OpenClawConnectionState = .notConfigured
   private let geminiService = GeminiLiveService()
-  private let openClawBridge = OpenClawBridge()
+  let openClawBridge = OpenClawBridge()  // Made internal for UserRegistryCoordinator
   private var toolCallRouter: ToolCallRouter?
+  var userRegistryCoordinator: UserRegistryCoordinator?
+  private var fullTranscript: String = ""
   private let audioManager = AudioManager()
   private let eventClient = OpenClawEventClient()
   private var lastVideoFrameTime: Date = .distantPast
@@ -64,6 +66,7 @@ class GeminiSessionViewModel: ObservableObject {
       Task { @MainActor in
         self.userTranscript += text
         self.aiTranscript = ""
+        self.fullTranscript += "User: " + text + "\n"
       }
     }
 
@@ -71,6 +74,7 @@ class GeminiSessionViewModel: ObservableObject {
       guard let self else { return }
       Task { @MainActor in
         self.aiTranscript += text
+        self.fullTranscript += "AI: " + text + "\n"
       }
     }
 
@@ -177,6 +181,11 @@ class GeminiSessionViewModel: ObservableObject {
   }
 
   func stopSession() {
+    // Save conversation before tearing down
+    if !fullTranscript.isEmpty {
+      userRegistryCoordinator?.endSession(transcript: fullTranscript)
+    }
+
     eventClient.disconnect()
     toolCallRouter?.cancelAll()
     toolCallRouter = nil
@@ -190,6 +199,7 @@ class GeminiSessionViewModel: ObservableObject {
     userTranscript = ""
     aiTranscript = ""
     toolCallStatus = .idle
+    fullTranscript = ""
   }
 
   func sendVideoFrameIfThrottled(image: UIImage) {
@@ -199,6 +209,30 @@ class GeminiSessionViewModel: ObservableObject {
     guard now.timeIntervalSince(lastVideoFrameTime) >= GeminiConfig.videoFrameInterval else { return }
     lastVideoFrameTime = now
     geminiService.sendVideoFrame(image: image)
+  }
+
+  func injectSystemContext(_ text: String) {
+    guard isGeminiActive, connectionState == .ready else {
+      NSLog("[Gemini] Cannot inject context, session not ready")
+      return
+    }
+
+    NSLog("[Gemini] Injecting system context: \(text)")
+
+    // Build a system message to inject context
+    let content: [String: Any] = [
+      "turns": [
+        [
+          "role": "user",
+          "parts": [
+            ["text": "[System Context: \(text)]"]
+          ]
+        ]
+      ]
+    ]
+
+    // Send via the public API
+    geminiService.sendClientContent(content)
   }
 
 }

@@ -9,6 +9,7 @@ class IPhoneCameraManager: NSObject {
   private var isRunning = false
 
   var onFrameCaptured: ((UIImage) -> Void)?
+  var faceDetectionManager: FaceDetectionManager?
 
   func start() {
     guard !isRunning else { return }
@@ -93,5 +94,10 @@ extension IPhoneCameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
     let image = UIImage(cgImage: cgImage)
 
     onFrameCaptured?(image)
+
+    // Pass sample buffer to face detection on background queue
+    if let detector = faceDetectionManager {
+      detector.detect(sampleBuffer: sampleBuffer)
+    }
   }
 }

@@ -287,6 +287,16 @@ class StreamSessionViewModel: ObservableObject {
   private func startIPhoneSession() {
     streamingMode = .iPhone
     let camera = IPhoneCameraManager()
+
+    // Initialize face detection & user registry
+    let faceDetector = FaceDetectionManager()
+    if let gemini = geminiSessionVM {
+      let coordinator = UserRegistryCoordinator(gemini: gemini)
+      faceDetector.delegate = coordinator
+      gemini.userRegistryCoordinator = coordinator
+    }
+    camera.faceDetectionManager = faceDetector
+
     camera.onFrameCaptured = { [weak self] image in
       Task { @MainActor [weak self] in
         guard let self else { return }
