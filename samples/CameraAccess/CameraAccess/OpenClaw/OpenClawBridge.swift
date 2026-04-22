@@ -38,8 +38,13 @@ class OpenClawBridge: ObservableObject {
       return
     }
     connectionState = .checking
-    guard let url = URL(string: "\(GeminiConfig.openClawHost):\(GeminiConfig.openClawPort)/v1/chat/completions") else {
-      connectionState = .unreachable("Invalid URL")
+
+    let host = GeminiConfig.openClawHost
+      .replacingOccurrences(of: "http://", with: "")
+      .replacingOccurrences(of: "https://", with: "")
+    let urlString = "http://\(host):\(GeminiConfig.openClawPort)/v1/chat/completions"
+    guard let url = URL(string: urlString) else {
+      connectionState = .unreachable("Invalid URL: \(urlString)")
       return
     }
     var request = URLRequest(url: url)
@@ -155,7 +160,7 @@ class OpenClawBridge: ObservableObject {
     toolName: String = "execute"
   ) async -> ToolResult {
     lastToolCallStatus = .executing(toolName)
-    
+
     // Check for LinkedIn requests first
     if let linkedInResult = await handleLinkedInRequest(task) {
       lastToolCallStatus = .completed("linkedin-finder")
@@ -164,8 +169,12 @@ class OpenClawBridge: ObservableObject {
       return linkedInResult
     }
 
-    guard let url = URL(string: "\(GeminiConfig.openClawHost):\(GeminiConfig.openClawPort)/v1/chat/completions") else {
-      lastToolCallStatus = .failed(toolName, "Invalid URL")
+    let host = GeminiConfig.openClawHost
+      .replacingOccurrences(of: "http://", with: "")
+      .replacingOccurrences(of: "https://", with: "")
+    let urlString = "http://\(host):\(GeminiConfig.openClawPort)/v1/chat/completions"
+    guard let url = URL(string: urlString) else {
+      lastToolCallStatus = .failed(toolName, "Invalid URL: \(urlString)")
       return .failure("Invalid gateway URL")
     }
 
@@ -226,6 +235,237 @@ class OpenClawBridge: ObservableObject {
       NSLog("[OpenClaw] Agent error: %@", error.localizedDescription)
       lastToolCallStatus = .failed(toolName, error.localizedDescription)
       return .failure("Agent error: \(error.localizedDescription)")
+    }
+  }
+
+  // MARK: - User Registry Intents (structured API)
+
+  /// Call lookup_face intent via /api/v1/message endpoint
+  func callUserRegistryLookup(
+    embedding: [Float],
+    threshold: Float = 0.4
+  ) async -> ToolResult {
+    lastToolCallStatus = .executing("lookup_face")
+
+    let host = GeminiConfig.openClawHost
+      .replacingOccurrences(of: "http://", with: "")
+      .replacingOccurrences(of: "https://", with: "")
+    let urlString = "http://\(host):\(GeminiConfig.openClawPort)/api/v1/message"
+
+    guard let url = URL(string: urlString) else {
+      lastToolCallStatus = .failed("lookup_face", "Invalid URL")
+      return .failure("Invalid gateway URL")
+    }
+
+    // Build intent payload
+    let embeddingData: [String: Any] = [
+      "embedding": embedding,
+      "threshold": threshold
+    ]
+
+    guard let embeddingJson = try? JSONSerialization.data(withJSONObject: embeddingData),
+          let embeddingStr = String(data: embeddingJson, encoding: .utf8) else {
+      lastToolCallStatus = .failed("lookup_face", "Failed to serialize embedding")
+      return .failure("Failed to serialize embedding")
+    }
+
+    let intentMessage = "[INTENT:lookup_face] \(embeddingStr)"
+
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.setValue("Bearer \(GeminiConfig.openClawGatewayToken)", forHTTPHeaderField: "Authorization")
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+    let body: [String: Any] = [
+      "channel": "webchat",
+      "message": intentMessage
+    ]
+
+    do {
+      request.httpBody = try JSONSerialization.data(withJSONObject: body)
+      let (data, response) = try await session.data(for: request)
+      let httpResponse = response as? HTTPURLResponse
+
+      guard let statusCode = httpResponse?.statusCode, (200...299).contains(statusCode) else {
+        let code = httpResponse?.statusCode ?? 0
+        NSLog("[OpenClaw] lookup_face failed: HTTP %d", code)
+        lastToolCallStatus = .failed("lookup_face", "HTTP \(code)")
+        return .failure("lookup_face returned HTTP \(code)")
+      }
+
+      // Parse response - expecting OpenClaw message response wrapper
+      if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+         let message = json["message"] as? String {
+        NSLog("[OpenClaw] lookup_face result: %@", String(message.prefix(200)))
+        lastToolCallStatus = .completed("lookup_face")
+        return .success(message)
+      }
+
+      let raw = String(data: data, encoding: .utf8) ?? "OK"
+      NSLog("[OpenClaw] lookup_face raw: %@", String(raw.prefix(200)))
+      lastToolCallStatus = .completed("lookup_face")
+      return .success(raw)
+    } catch {
+      NSLog("[OpenClaw] lookup_face error: %@", error.localizedDescription)
+      lastToolCallStatus = .failed("lookup_face", error.localizedDescription)
+      return .failure("lookup_face error: \(error.localizedDescription)")
+    }
+  }
+
+  /// Call register_face intent via /api/v1/message endpoint
+  func callUserRegistryRegister(
+    embedding: [Float],
+    confidence: Float,
+    snapshotJPEG: Data?,
+    locationHint: String?
+  ) async -> ToolResult {
+    lastToolCallStatus = .executing("register_face")
+
+    let host = GeminiConfig.openClawHost
+      .replacingOccurrences(of: "http://", with: "")
+      .replacingOccurrences(of: "https://", with: "")
+    let urlString = "http://\(host):\(GeminiConfig.openClawPort)/api/v1/message"
+
+    guard let url = URL(string: urlString) else {
+      lastToolCallStatus = .failed("register_face", "Invalid URL")
+      return .failure("Invalid gateway URL")
+    }
+
+    var registerData: [String: Any] = [
+      "embedding": embedding,
+      "confidence_score": confidence,
+      "source": "mediapipe"
+    ]
+
+    if let snapshot = snapshotJPEG {
+      registerData["snapshot_url"] = "data:image/jpeg;base64," + snapshot.base64EncodedString()
+    }
+
+    if let location = locationHint {
+      registerData["location_hint"] = location
+    }
+
+    guard let registerJson = try? JSONSerialization.data(withJSONObject: registerData),
+          let registerStr = String(data: registerJson, encoding: .utf8) else {
+      lastToolCallStatus = .failed("register_face", "Failed to serialize")
+      return .failure("Failed to serialize register data")
+    }
+
+    let intentMessage = "[INTENT:register_face] \(registerStr)"
+
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.setValue("Bearer \(GeminiConfig.openClawGatewayToken)", forHTTPHeaderField: "Authorization")
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+    let body: [String: Any] = [
+      "channel": "webchat",
+      "message": intentMessage
+    ]
+
+    do {
+      request.httpBody = try JSONSerialization.data(withJSONObject: body)
+      let (data, response) = try await session.data(for: request)
+      let httpResponse = response as? HTTPURLResponse
+
+      guard let statusCode = httpResponse?.statusCode, (200...299).contains(statusCode) else {
+        let code = httpResponse?.statusCode ?? 0
+        NSLog("[OpenClaw] register_face failed: HTTP %d", code)
+        lastToolCallStatus = .failed("register_face", "HTTP \(code)")
+        return .failure("register_face returned HTTP \(code)")
+      }
+
+      if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+         let message = json["message"] as? String {
+        NSLog("[OpenClaw] register_face result: %@", String(message.prefix(200)))
+        lastToolCallStatus = .completed("register_face")
+        return .success(message)
+      }
+
+      let raw = String(data: data, encoding: .utf8) ?? "OK"
+      lastToolCallStatus = .completed("register_face")
+      return .success(raw)
+    } catch {
+      NSLog("[OpenClaw] register_face error: %@", error.localizedDescription)
+      lastToolCallStatus = .failed("register_face", error.localizedDescription)
+      return .failure("register_face error: \(error.localizedDescription)")
+    }
+  }
+
+  /// Call save_conversation intent via /api/v1/message endpoint
+  func callUserRegistrySaveConversation(
+    userId: String,
+    transcript: String,
+    durationSeconds: Int,
+    locationHint: String?
+  ) async -> ToolResult {
+    lastToolCallStatus = .executing("save_conversation")
+
+    let host = GeminiConfig.openClawHost
+      .replacingOccurrences(of: "http://", with: "")
+      .replacingOccurrences(of: "https://", with: "")
+    let urlString = "http://\(host):\(GeminiConfig.openClawPort)/api/v1/message"
+
+    guard let url = URL(string: urlString) else {
+      lastToolCallStatus = .failed("save_conversation", "Invalid URL")
+      return .failure("Invalid gateway URL")
+    }
+
+    var saveData: [String: Any] = [
+      "user_id": userId,
+      "transcript": transcript,
+      "duration_seconds": durationSeconds,
+      "occurred_at": ISO8601DateFormatter().string(from: Date())
+    ]
+
+    if let location = locationHint {
+      saveData["location_hint"] = location
+    }
+
+    guard let saveJson = try? JSONSerialization.data(withJSONObject: saveData),
+          let saveStr = String(data: saveJson, encoding: .utf8) else {
+      lastToolCallStatus = .failed("save_conversation", "Failed to serialize")
+      return .failure("Failed to serialize conversation data")
+    }
+
+    let intentMessage = "[INTENT:save_conversation] \(saveStr)"
+
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.setValue("Bearer \(GeminiConfig.openClawGatewayToken)", forHTTPHeaderField: "Authorization")
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+    let body: [String: Any] = [
+      "channel": "webchat",
+      "message": intentMessage
+    ]
+
+    do {
+      request.httpBody = try JSONSerialization.data(withJSONObject: body)
+      let (data, response) = try await session.data(for: request)
+      let httpResponse = response as? HTTPURLResponse
+
+      guard let statusCode = httpResponse?.statusCode, (200...299).contains(statusCode) else {
+        let code = httpResponse?.statusCode ?? 0
+        NSLog("[OpenClaw] save_conversation failed: HTTP %d", code)
+        lastToolCallStatus = .failed("save_conversation", "HTTP \(code)")
+        return .failure("save_conversation returned HTTP \(code)")
+      }
+
+      if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+         let message = json["message"] as? String {
+        NSLog("[OpenClaw] save_conversation result: %@", String(message.prefix(200)))
+        lastToolCallStatus = .completed("save_conversation")
+        return .success(message)
+      }
+
+      let raw = String(data: data, encoding: .utf8) ?? "OK"
+      lastToolCallStatus = .completed("save_conversation")
+      return .success(raw)
+    } catch {
+      NSLog("[OpenClaw] save_conversation error: %@", error.localizedDescription)
+      lastToolCallStatus = .failed("save_conversation", error.localizedDescription)
+      return .failure("save_conversation error: \(error.localizedDescription)")
     }
   }
 }

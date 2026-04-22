@@ -41,16 +41,13 @@ class UserRegistryCoordinator: FaceDetectionDelegate {
     // MARK: - Face Detection Flow
 
     private func handleFaceDetection(_ result: FaceDetectionResult) async {
-        // Build lookup task description for OpenClaw
-        let embeddingJson = result.embedding.map { String(format: "%.6f", $0) }.joined(separator: ",")
-        let task = """
-        lookup_face: Search for a face with embedding [\(embeddingJson)] using threshold 0.4. \
-        If matched, return the user's name, last seen date, and recent conversations. \
-        If not matched, register as a new face.
-        """
+        NSLog("[UserRegistry] Calling lookup_face intent with %d-dim embedding", result.embedding.count)
 
-        // Call OpenClaw
-        let toolResult = await openClawBridge.delegateTask(task: task, toolName: "lookup_face")
+        // Call new structured lookup method
+        let toolResult = await openClawBridge.callUserRegistryLookup(
+            embedding: result.embedding,
+            threshold: 0.4
+        )
 
         switch toolResult {
         case .success(let response):
@@ -63,7 +60,6 @@ class UserRegistryCoordinator: FaceDetectionDelegate {
 
     private func processLookupResponse(_ response: String, originalResult: FaceDetectionResult) async {
         // Parse OpenClaw's response
-        // Expected format from skill: JSON with { matched: bool, user_id: string, ... }
         guard let data = response.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             NSLog("[UserRegistry] Failed to parse lookup response")
@@ -85,13 +81,36 @@ class UserRegistryCoordinator: FaceDetectionDelegate {
 
             let context = buildUserContext(name: name, lastSeen: lastSeen, topics: topics, actionItems: actionItems)
             injectContextIntoGemini(context)
+
+            NSLog("[UserRegistry] Known user recognized: %@", userId)
         } else {
-            // New person - skill should have already registered
-            if let userId = json["user_id"] as? String {
+            // No match - explicitly register new face
+            NSLog("[UserRegistry] No match found, registering new face")
+            await registerNewFace(originalResult)
+        }
+    }
+
+    /// Explicitly register a new face when lookup returns no match
+    private func registerNewFace(_ result: FaceDetectionResult) async {
+        let toolResult = await openClawBridge.callUserRegistryRegister(
+            embedding: result.embedding,
+            confidence: result.confidence,
+            snapshotJPEG: result.snapshotJPEG,
+            locationHint: nil
+        )
+
+        switch toolResult {
+        case .success(let response):
+            // Parse registration response
+            if let data = response.data(using: .utf8),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let userId = json["user_id"] as? String {
                 currentUserId = userId
                 sessionStartTime = Date()
-                NSLog("[UserRegistry] New user registered: \(userId)")
+                NSLog("[UserRegistry] New user registered: %@", userId)
             }
+        case .failure(let error):
+            NSLog("[UserRegistry] Registration failed: %@", error)
         }
     }
 
@@ -151,21 +170,21 @@ class UserRegistryCoordinator: FaceDetectionDelegate {
 
         let duration = sessionStartTime.map { Int(Date().timeIntervalSince($0)) } ?? 0
 
-        NSLog("[UserRegistry] Saving conversation for user \(userId), duration: \(duration)s")
+        NSLog("[UserRegistry] Saving conversation for user %@, duration: %ds", userId, duration)
 
         Task {
-            let task = """
-            save_conversation: Save a conversation for user_id '\(userId)' with transcript: \
-            "\(transcript)". Duration: \(duration) seconds. Extract topics and action items from the transcript.
-            """
-
-            let result = await openClawBridge.delegateTask(task: task, toolName: "save_conversation")
+            let result = await openClawBridge.callUserRegistrySaveConversation(
+                userId: userId,
+                transcript: transcript,
+                durationSeconds: duration,
+                locationHint: nil
+            )
 
             switch result {
-            case .success:
-                NSLog("[UserRegistry] Conversation saved successfully")
+            case .success(let response):
+                NSLog("[UserRegistry] Conversation saved: %@", String(response.prefix(100)))
             case .failure(let error):
-                NSLog("[UserRegistry] Failed to save conversation: \(error)")
+                NSLog("[UserRegistry] Failed to save conversation: %@", error)
             }
 
             resetSession()

@@ -81,7 +81,7 @@ class UserRegistryBridge {
         }
 
         let response: ConversationSaveResponse? = await post(url: url, body: body)
-        return response?.data?.conversation_id != nil
+        return response?.data?.conversationId != nil
     }
 
     // MARK: - Private Helpers

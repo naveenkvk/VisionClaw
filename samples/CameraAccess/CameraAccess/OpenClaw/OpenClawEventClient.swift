@@ -10,6 +10,10 @@ class OpenClawEventClient {
   private var reconnectDelay: TimeInterval = 2
   private let maxReconnectDelay: TimeInterval = 30
 
+  // Stable client ID for OpenClaw gateway validation
+  // Configured in Secrets.swift - must match OpenClaw's expected client identifier
+  private var clientId: String { GeminiConfig.openClawClientId }
+
   func connect() {
     guard GeminiConfig.isOpenClawConfigured else {
       NSLog("[OpenClawWS] Not configured, skipping")
@@ -126,7 +130,7 @@ class OpenClawEventClient {
         "minProtocol": 3,
         "maxProtocol": 3,
         "client": [
-          "id": "ios-node",
+          "id": clientId,
           "displayName": "VisionClaw Glass",
           "version": "1.0",
           "platform": "ios",

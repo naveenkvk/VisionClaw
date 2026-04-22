@@ -11,19 +11,32 @@ struct FaceLookupResponse: Codable {
         let matched: Bool
         let user: User?
         let confidence: Float?
-        let recent_conversations: [Conversation]
+        let recentConversations: [Conversation]
 
         struct User: Codable {
             let id: String
             let name: String?
             let notes: String?
-            let last_seen_at: String
+            let lastSeenAt: String
+
+            enum CodingKeys: String, CodingKey {
+                case id
+                case name
+                case notes
+                case lastSeenAt = "last_seen_at"
+            }
         }
 
         struct Conversation: Codable {
             let topics: [String]
-            let action_items: [String]
-            let occurred_at: String
+            let actionItems: [String]
+            let occurredAt: String
+
+            enum CodingKeys: String, CodingKey {
+                case topics
+                case actionItems = "action_items"
+                case occurredAt = "occurred_at"
+            }
         }
     }
 }
@@ -34,9 +47,15 @@ struct FaceRegistrationResponse: Codable {
     let error: APIError?
 
     struct FaceRegistrationData: Codable {
-        let user_id: String
-        let face_embedding_id: String
-        let is_new_user: Bool
+        let userId: String
+        let faceEmbeddingId: String
+        let isNewUser: Bool
+
+        enum CodingKeys: String, CodingKey {
+            case userId = "user_id"
+            case faceEmbeddingId = "face_embedding_id"
+            case isNewUser = "is_new_user"
+        }
     }
 }
 
@@ -46,7 +65,11 @@ struct ConversationSaveResponse: Codable {
     let error: APIError?
 
     struct ConversationData: Codable {
-        let conversation_id: String
+        let conversationId: String
+
+        enum CodingKeys: String, CodingKey {
+            case conversationId = "conversation_id"
+        }
     }
 }
 
