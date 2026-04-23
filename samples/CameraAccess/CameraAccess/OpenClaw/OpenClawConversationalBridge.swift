@@ -55,7 +55,7 @@ class OpenClawConversationalBridge {
 
         do {
             let encoder = JSONEncoder()
-            encoder.keyEncodingStrategy = .convertToSnakeCase
+            // API expects camelCase - no key conversion needed
             request.httpBody = try encoder.encode(requestBody)
 
             let (data, response) = try await session.data(for: request)
@@ -71,7 +71,7 @@ class OpenClawConversationalBridge {
             }
 
             let decoder = JSONDecoder()
-            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            // API returns camelCase - no key conversion needed
             let conversationalResponse = try decoder.decode(ConversationalLookupResponse.self, from: data)
 
             os_log("Conversational lookup successful", log: log, type: .info)
@@ -109,7 +109,7 @@ class OpenClawConversationalBridge {
 
         do {
             let encoder = JSONEncoder()
-            encoder.keyEncodingStrategy = .convertToSnakeCase
+            // API expects camelCase - no key conversion needed
             request.httpBody = try encoder.encode(requestBody)
 
             let (data, response) = try await session.data(for: request)
@@ -121,7 +121,7 @@ class OpenClawConversationalBridge {
             }
 
             let decoder = JSONDecoder()
-            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            // API returns camelCase - no key conversion needed
             let conversationalResponse = try decoder.decode(ConversationalRegisterResponse.self, from: data)
 
             os_log("Conversational register successful", log: log, type: .info)
@@ -161,7 +161,7 @@ class OpenClawConversationalBridge {
 
         do {
             let encoder = JSONEncoder()
-            encoder.keyEncodingStrategy = .convertToSnakeCase
+            // API expects camelCase - no key conversion needed
             request.httpBody = try encoder.encode(requestBody)
 
             let (data, response) = try await session.data(for: request)
@@ -173,7 +173,7 @@ class OpenClawConversationalBridge {
             }
 
             let decoder = JSONDecoder()
-            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            // API returns camelCase - no key conversion needed
             let conversationalResponse = try decoder.decode(ConversationalSaveResponse.self, from: data)
 
             os_log("Conversational save successful", log: log, type: .info)
@@ -208,7 +208,7 @@ class OpenClawConversationalBridge {
             }
 
             let decoder = JSONDecoder()
-            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            // API returns camelCase - no key conversion needed
             let conversationalResponse = try decoder.decode(ConversationalLookupResponse.self, from: data)
 
             os_log("User summary retrieved", log: log, type: .info)

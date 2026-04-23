@@ -6,24 +6,14 @@ struct ConversationalLookupRequest: Codable {
     let registryResponse: String  // JSON-encoded registry response
     let embedding: [Float]
     let locationHint: String?
-
-    enum CodingKeys: String, CodingKey {
-        case registryResponse = "registry_response"
-        case embedding
-        case locationHint = "location_hint"
-    }
+    // API expects camelCase - Swift property names match
 }
 
 struct ConversationalLookupResponse: Codable {
     let conversational: String
     let user: UserSummary?
     let shouldInject: Bool
-
-    enum CodingKeys: String, CodingKey {
-        case conversational
-        case user
-        case shouldInject = "should_inject"
-    }
+    // API returns camelCase - Swift property names match
 }
 
 struct UserSummary: Codable {
@@ -32,14 +22,7 @@ struct UserSummary: Codable {
     let lastSeenAt: String?
     let recentTopics: [String]
     let actionItems: [String]
-
-    enum CodingKeys: String, CodingKey {
-        case userId = "user_id"
-        case name
-        case lastSeenAt = "last_seen_at"
-        case recentTopics = "recent_topics"
-        case actionItems = "action_items"
-    }
+    // API returns camelCase - Swift property names match
 }
 
 // MARK: - Conversational Register
@@ -48,24 +31,14 @@ struct ConversationalRegisterRequest: Codable {
     let registryResponse: String
     let embedding: [Float]
     let locationHint: String?
-
-    enum CodingKeys: String, CodingKey {
-        case registryResponse = "registry_response"
-        case embedding
-        case locationHint = "location_hint"
-    }
+    // API expects camelCase - Swift property names match
 }
 
 struct ConversationalRegisterResponse: Codable {
     let conversational: String
     let userId: String
     let shouldInject: Bool
-
-    enum CodingKeys: String, CodingKey {
-        case conversational
-        case userId = "user_id"
-        case shouldInject = "should_inject"
-    }
+    // API returns camelCase - Swift property names match
 }
 
 // MARK: - Conversational Save
@@ -75,23 +48,13 @@ struct ConversationalSaveRequest: Codable {
     let transcript: String
     let durationSeconds: Int
     let locationHint: String?
-
-    enum CodingKeys: String, CodingKey {
-        case userId = "user_id"
-        case transcript
-        case durationSeconds = "duration_seconds"
-        case locationHint = "location_hint"
-    }
+    // API expects camelCase - Swift property names match
 }
 
 struct ConversationalSaveResponse: Codable {
     let conversational: String
     let conversationId: String
-
-    enum CodingKeys: String, CodingKey {
-        case conversational
-        case conversationId = "conversation_id"
-    }
+    // API returns camelCase - Swift property names match
 }
 
 // MARK: - Helper Extensions
@@ -99,7 +62,7 @@ struct ConversationalSaveResponse: Codable {
 extension FaceLookupResponse {
     func toJSON() -> String {
         let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
+        // Keep camelCase consistent with API expectations
         guard let data = try? encoder.encode(self),
               let json = String(data: data, encoding: .utf8) else {
             return "{}"
@@ -111,7 +74,7 @@ extension FaceLookupResponse {
 extension FaceRegistrationResponse {
     func toJSON() -> String {
         let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
+        // Keep camelCase consistent with API expectations
         guard let data = try? encoder.encode(self),
               let json = String(data: data, encoding: .utf8) else {
             return "{}"

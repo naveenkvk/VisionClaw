@@ -18,25 +18,14 @@ struct FaceLookupResponse: Codable {
             let name: String?
             let notes: String?
             let lastSeenAt: String
-
-            enum CodingKeys: String, CodingKey {
-                case id
-                case name
-                case notes
-                case lastSeenAt = "last_seen_at"
-            }
+            // No CodingKeys needed - API returns camelCase matching Swift property names
         }
 
         struct Conversation: Codable {
             let topics: [String]
             let actionItems: [String]
             let occurredAt: String
-
-            enum CodingKeys: String, CodingKey {
-                case topics
-                case actionItems = "action_items"
-                case occurredAt = "occurred_at"
-            }
+            // No CodingKeys needed - API returns camelCase matching Swift property names
         }
     }
 }
@@ -50,12 +39,7 @@ struct FaceRegistrationResponse: Codable {
         let userId: String
         let faceEmbeddingId: String
         let isNewUser: Bool
-
-        enum CodingKeys: String, CodingKey {
-            case userId = "user_id"
-            case faceEmbeddingId = "face_embedding_id"
-            case isNewUser = "is_new_user"
-        }
+        // No CodingKeys needed - API returns camelCase matching Swift property names
     }
 }
 
@@ -66,10 +50,7 @@ struct ConversationSaveResponse: Codable {
 
     struct ConversationData: Codable {
         let conversationId: String
-
-        enum CodingKeys: String, CodingKey {
-            case conversationId = "conversation_id"
-        }
+        // No CodingKeys needed - API returns camelCase matching Swift property names
     }
 }
 

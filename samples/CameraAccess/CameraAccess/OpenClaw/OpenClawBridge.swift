@@ -32,6 +32,13 @@ class OpenClawBridge: ObservableObject {
     self.sessionKey = OpenClawBridge.stableSessionKey
   }
 
+  // MARK: - Authentication Helper
+
+  /// Get authorization header value using static token (HTTP-only architecture)
+  private func getAuthorizationHeader() -> String {
+    return "Bearer \(GeminiConfig.openClawGatewayToken)"
+  }
+
   func checkConnection() async {
     guard GeminiConfig.isOpenClawConfigured else {
       connectionState = .notConfigured
@@ -49,7 +56,7 @@ class OpenClawBridge: ObservableObject {
     }
     var request = URLRequest(url: url)
     request.httpMethod = "GET"
-    request.setValue("Bearer \(GeminiConfig.openClawGatewayToken)", forHTTPHeaderField: "Authorization")
+    request.setValue(getAuthorizationHeader(), forHTTPHeaderField: "Authorization")
     request.setValue("glass", forHTTPHeaderField: "x-openclaw-message-channel")
     do {
       let (_, response) = try await pingSession.data(for: request)
@@ -124,7 +131,7 @@ class OpenClawBridge: ObservableObject {
     
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
-    request.setValue("Bearer \(GeminiConfig.openClawGatewayToken)", forHTTPHeaderField: "Authorization")
+    request.setValue(getAuthorizationHeader(), forHTTPHeaderField: "Authorization")
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
     
     let body: [String: Any] = [
@@ -188,7 +195,7 @@ class OpenClawBridge: ObservableObject {
 
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
-    request.setValue("Bearer \(GeminiConfig.openClawGatewayToken)", forHTTPHeaderField: "Authorization")
+    request.setValue(getAuthorizationHeader(), forHTTPHeaderField: "Authorization")
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
     request.setValue(sessionKey, forHTTPHeaderField: "x-openclaw-session-key")
     request.setValue("glass", forHTTPHeaderField: "x-openclaw-message-channel")
@@ -273,7 +280,7 @@ class OpenClawBridge: ObservableObject {
 
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
-    request.setValue("Bearer \(GeminiConfig.openClawGatewayToken)", forHTTPHeaderField: "Authorization")
+    request.setValue(getAuthorizationHeader(), forHTTPHeaderField: "Authorization")
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
     let body: [String: Any] = [
@@ -355,7 +362,7 @@ class OpenClawBridge: ObservableObject {
 
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
-    request.setValue("Bearer \(GeminiConfig.openClawGatewayToken)", forHTTPHeaderField: "Authorization")
+    request.setValue(getAuthorizationHeader(), forHTTPHeaderField: "Authorization")
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
     let body: [String: Any] = [
@@ -432,7 +439,7 @@ class OpenClawBridge: ObservableObject {
 
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
-    request.setValue("Bearer \(GeminiConfig.openClawGatewayToken)", forHTTPHeaderField: "Authorization")
+    request.setValue(getAuthorizationHeader(), forHTTPHeaderField: "Authorization")
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
     let body: [String: Any] = [

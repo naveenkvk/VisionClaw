@@ -23,6 +23,7 @@ class UserRegistryBridge {
             "threshold": threshold
         ]
 
+        NSLog("[UserRegistry] Searching with %d-dim embedding, threshold: %.2f", embedding.count, threshold)
         return await post(url: url, body: body)
     }
 
@@ -37,21 +38,22 @@ class UserRegistryBridge {
 
         var body: [String: Any] = [
             "embedding": embedding,
-            "confidence_score": confidence,
+            "confidenceScore": confidence,  // camelCase for NestJS
             "source": "mediapipe"
         ]
 
-        if let snapshot = snapshotJPEG {
-            // Base64 encode snapshot
-            body["snapshot_url"] = "data:image/jpeg;base64," + snapshot.base64EncodedString()
-        }
+        // TODO: Snapshot disabled - base64 encoding exceeds VARCHAR(500) limit in database
+        // Need to either: increase DB column size, store in blob storage, or use file URLs
+        // if let snapshot = snapshotJPEG {
+        //     body["snapshotUrl"] = "data:image/jpeg;base64," + snapshot.base64EncodedString()
+        // }
 
         if let location = locationHint {
-            body["location_hint"] = location
+            body["locationHint"] = location  // camelCase
         }
 
         if let userId = existingUserId {
-            body["existing_user_id"] = userId
+            body["existingUserId"] = userId  // camelCase
         }
 
         return await post(url: url, body: body)
@@ -68,16 +70,16 @@ class UserRegistryBridge {
         guard let url = buildURL(path: "/conversations") else { return false }
 
         var body: [String: Any] = [
-            "user_id": userId,
+            "userId": userId,                    // camelCase for NestJS
             "transcript": transcript,
             "topics": topics,
-            "action_items": actionItems,
-            "duration_seconds": durationSeconds,
-            "occurred_at": ISO8601DateFormatter().string(from: Date())
+            "actionItems": actionItems,          // camelCase for NestJS
+            "durationSeconds": durationSeconds,  // camelCase for NestJS
+            "occurredAt": ISO8601DateFormatter().string(from: Date())  // camelCase for NestJS
         ]
 
         if let location = locationHint {
-            body["location_hint"] = location
+            body["locationHint"] = location  // camelCase
         }
 
         let response: ConversationSaveResponse? = await post(url: url, body: body)
@@ -107,6 +109,17 @@ class UserRegistryBridge {
 
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+            // Log request details (excluding embedding to reduce noise)
+            var logBody = body
+            if let embedding = logBody["embedding"] as? [Float] {
+                logBody["embedding"] = "[<\(embedding.count) values>]"
+            }
+            if let bodyData = try? JSONSerialization.data(withJSONObject: logBody),
+               let bodyStr = String(data: bodyData, encoding: .utf8) {
+                NSLog("[UserRegistry] POST %@: %@", url.path, String(bodyStr.prefix(200)))
+            }
+
             let (data, response) = try await session.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
@@ -114,16 +127,27 @@ class UserRegistryBridge {
                 return nil
             }
 
+            // Log response status and body
+            let responseStr = String(data: data, encoding: .utf8) ?? "no body"
+            NSLog("[UserRegistry] Response HTTP %d: %@", httpResponse.statusCode, String(responseStr.prefix(300)))
+
             guard (200...299).contains(httpResponse.statusCode) else {
-                let bodyStr = String(data: data, encoding: .utf8) ?? "no body"
-                NSLog("[UserRegistry] HTTP %d: %@", httpResponse.statusCode, String(bodyStr.prefix(200)))
                 return nil
             }
 
+            // Try to decode, log response data on failure
             let decoder = JSONDecoder()
-            return try decoder.decode(T.self, from: data)
+            // User Registry returns camelCase, so no key conversion needed
+            do {
+                return try decoder.decode(T.self, from: data)
+            } catch {
+                let responseStr = String(data: data, encoding: .utf8) ?? "no response"
+                NSLog("[UserRegistry] Decoding error: \(error.localizedDescription)")
+                NSLog("[UserRegistry] Response was: %@", String(responseStr.prefix(500)))
+                return nil
+            }
         } catch {
-            NSLog("[UserRegistry] Error: \(error.localizedDescription)")
+            NSLog("[UserRegistry] Request error: \(error.localizedDescription)")
             return nil
         }
     }

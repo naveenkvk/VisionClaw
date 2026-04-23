@@ -17,7 +17,7 @@ class GeminiSessionViewModel: ObservableObject {
   var userRegistryCoordinator: UserRegistryCoordinator?
   private var fullTranscript: String = ""
   private let audioManager = AudioManager()
-  private let eventClient = OpenClawEventClient()
+  // WebSocket removed - using HTTP-only architecture
   private var lastVideoFrameTime: Date = .distantPast
   private var stateObservation: Task<Void, Never>?
 
@@ -167,17 +167,8 @@ class GeminiSessionViewModel: ObservableObject {
       return
     }
 
-    // Connect to OpenClaw event stream for proactive notifications
-    if SettingsManager.shared.proactiveNotificationsEnabled {
-      eventClient.onNotification = { [weak self] text in
-        guard let self else { return }
-        Task { @MainActor in
-          guard self.isGeminiActive, self.connectionState == .ready else { return }
-          self.geminiService.sendTextMessage(text)
-        }
-      }
-      eventClient.connect()
-    }
+    // Proactive notifications removed with WebSocket migration to HTTP-only
+    // All functionality continues via HTTP through OpenClawBridge
   }
 
   func stopSession() {
@@ -186,7 +177,6 @@ class GeminiSessionViewModel: ObservableObject {
       userRegistryCoordinator?.endSession(transcript: fullTranscript)
     }
 
-    eventClient.disconnect()
     toolCallRouter?.cancelAll()
     toolCallRouter = nil
     audioManager.stopCapture()
