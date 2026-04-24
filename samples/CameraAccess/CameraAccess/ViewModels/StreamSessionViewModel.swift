@@ -288,15 +288,15 @@ class StreamSessionViewModel: ObservableObject {
     streamingMode = .iPhone
     let camera = IPhoneCameraManager()
 
-    // Initialize face detection & user registry (dual-API architecture)
+    // Initialize face detection & user registry (unified OpenResponses API)
     let faceDetector = FaceDetectionManager()
     if let gemini = geminiSessionVM {
       let userRegistryBridge = UserRegistryBridge()
-      let conversationalBridge = OpenClawConversationalBridge()
+      let openResponsesBridge = OpenResponsesBridge()
       let coordinator = UserRegistryCoordinator(
         userRegistryBridge: userRegistryBridge,
         openClawBridge: gemini.openClawBridge,
-        conversationalBridge: conversationalBridge,
+        openResponsesBridge: openResponsesBridge,
         gemini: gemini
       )
       faceDetector.delegate = coordinator

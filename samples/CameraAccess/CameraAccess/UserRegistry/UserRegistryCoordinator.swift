@@ -1,14 +1,14 @@
 import Foundation
 
 /// Orchestrates face detection → lookup → context injection → conversation save flow
-/// Uses dual-API architecture: User Registry (direct) + OpenClaw Conversational (processing)
+/// Uses unified OpenResponses API for context/profile management
 @MainActor
 class UserRegistryCoordinator: FaceDetectionDelegate {
     // MARK: - Dependencies
     private weak var geminiViewModel: GeminiSessionViewModel?
     private let userRegistryBridge: UserRegistryBridge
     private let openClawBridge: OpenClawBridge
-    private let conversationalBridge: OpenClawConversationalBridge
+    private let openResponsesBridge: OpenResponsesBridge
 
     // MARK: - Session State
     private var currentUserId: String?
@@ -19,12 +19,12 @@ class UserRegistryCoordinator: FaceDetectionDelegate {
     init(
         userRegistryBridge: UserRegistryBridge,
         openClawBridge: OpenClawBridge,
-        conversationalBridge: OpenClawConversationalBridge,
+        openResponsesBridge: OpenResponsesBridge,
         gemini: GeminiSessionViewModel
     ) {
         self.userRegistryBridge = userRegistryBridge
         self.openClawBridge = openClawBridge
-        self.conversationalBridge = conversationalBridge
+        self.openResponsesBridge = openResponsesBridge
         self.geminiViewModel = gemini
     }
 
@@ -49,46 +49,40 @@ class UserRegistryCoordinator: FaceDetectionDelegate {
         // Could trigger session end here, but spec says wait for explicit endSession call
     }
 
-    // MARK: - Face Detection Flow (Dual-API Architecture)
+    // MARK: - Face Detection Flow (Unified OpenResponses API)
 
     private func handleFaceDetection(_ result: FaceDetectionResult) async {
-        NSLog("[UserRegistry] Processing face detection (dual-API flow)...")
+        NSLog("[UserRegistry] Processing face detection...")
 
-        // Step 1: Call User Registry directly for raw data
+        // Step 1: Face lookup via User Registry (direct, unchanged)
         guard let lookupResponse = await userRegistryBridge.searchFace(
             embedding: result.embedding,
             threshold: 0.4
         ) else {
-            NSLog("[UserRegistry] Direct lookup failed, skipping")
+            NSLog("[UserRegistry] Direct lookup failed")
             return
         }
 
-        // Step 2: Send raw response to OpenClaw for conversational processing
-        guard let conversationalResponse = await conversationalBridge.lookupFaceConversational(
-            registryResponse: lookupResponse.toJSON(),
-            embedding: result.embedding,
-            locationHint: nil  // TODO: Add location tracking
-        ) else {
-            NSLog("[UserRegistry] Conversational processing failed, falling back to raw data")
-            // Fallback: process raw response without conversational enhancement
-            await processRawLookupResponse(lookupResponse, originalResult: result)
-            return
-        }
+        // Step 2: Handle based on match result
+        if let data = lookupResponse.data, data.matched, let user = data.user {
+            // Known user - fetch conversational context via OpenResponses
+            NSLog("[UserRegistry] Known user detected: %@", user.id)
 
-        // Step 3: Handle based on match result
-        if let data = lookupResponse.data, data.matched, let user = conversationalResponse.user {
-            // Known user - inject conversational context
-            currentUserId = user.userId
+            currentUserId = user.id
             currentUserName = user.name
             sessionStartTime = Date()
 
-            if conversationalResponse.shouldInject {
-                injectContextIntoGemini(conversationalResponse.conversational)
+            // Call OpenResponses fetch stage
+            if let contextText = await openResponsesBridge.fetchContext(userId: user.id) {
+                injectContextIntoGemini(contextText)
+                NSLog("[UserRegistry] Context injected for user: %@", user.name ?? user.id)
+            } else {
+                // Fallback: build context from raw data
+                NSLog("[UserRegistry] Context fetch failed, using fallback")
+                await processRawLookupResponse(lookupResponse, originalResult: result)
             }
-
-            NSLog("[UserRegistry] Recognized user: %@", user.name ?? user.userId)
         } else {
-            // Unknown user - register directly, get conversational feedback
+            // Unknown user - register
             NSLog("[UserRegistry] No match, registering new face...")
             await registerNewFace(result)
         }
@@ -123,12 +117,12 @@ class UserRegistryCoordinator: FaceDetectionDelegate {
 
     /// Explicitly register a new face when lookup returns no match
     private func registerNewFace(_ result: FaceDetectionResult) async {
-        // Step 1: Register directly with User Registry
+        // Step 1: Register face directly with User Registry
         guard let registerResponse = await userRegistryBridge.registerFace(
             embedding: result.embedding,
             confidence: result.confidence,
             snapshotJPEG: result.snapshotJPEG,
-            locationHint: nil,
+            locationHint: nil,  // TODO: Add location tracking
             existingUserId: nil
         ) else {
             NSLog("[UserRegistry] Registration failed")
@@ -140,24 +134,22 @@ class UserRegistryCoordinator: FaceDetectionDelegate {
             return
         }
 
-        // Step 2: Get conversational feedback from OpenClaw
-        let conversationalResponse = await conversationalBridge.registerFaceConversational(
-            registryResponse: registerResponse.toJSON(),
-            embedding: result.embedding,
-            locationHint: nil
-        )
-
-        // Step 3: Update local state
+        // Update local state immediately
         currentUserId = data.userId
-        currentUserName = nil
+        currentUserName = nil  // Will be set when user identifies themselves
         sessionStartTime = Date()
 
-        // Optionally inject conversational registration message
-        if let response = conversationalResponse, response.shouldInject {
-            injectContextIntoGemini(response.conversational)
+        // Step 2: Register profile via OpenResponses (minimal profile initially)
+        if let welcomeMessage = await openResponsesBridge.registerUser(
+            userId: data.userId,
+            profile: UserProfile.minimal()
+        ) {
+            injectContextIntoGemini(welcomeMessage)
+            NSLog("[UserRegistry] New user registered with welcome: %@", data.userId)
+        } else {
+            NSLog("[UserRegistry] Profile registration failed (non-fatal, face is registered)")
+            // Continue anyway - face is registered in User Registry
         }
-
-        NSLog("[UserRegistry] Registered new user: %@", data.userId)
     }
 
     private func buildUserContext(name: String?, lastSeen: String?, topics: [String], actionItems: [String]) -> String {
@@ -215,37 +207,32 @@ class UserRegistryCoordinator: FaceDetectionDelegate {
         }
 
         let duration = sessionStartTime.map { Int(Date().timeIntervalSince($0)) } ?? 0
-
-        NSLog("[UserRegistry] Saving conversation for user %@, duration: %ds", userId, duration)
+        NSLog("[UserRegistry] Ending session for user %@ (duration: %ds)", userId, duration)
 
         Task {
-            // Step 1: Save directly to User Registry
-            // NOTE: Topics and action items extracted by OpenClaw, so pass empty arrays here
-            let success = await userRegistryBridge.saveConversation(
+            // Call OpenResponses update stage
+            if let updateResponse = await openResponsesBridge.updateFromTranscript(
                 userId: userId,
-                transcript: transcript,
-                topics: [],  // Will be extracted by OpenClaw
-                actionItems: [],  // Will be extracted by OpenClaw
-                durationSeconds: duration,
-                locationHint: nil
-            )
+                chatTranscript: transcript
+            ) {
+                NSLog("[UserRegistry] Conversation updated: %@", updateResponse.status)
 
-            // Step 2: Notify OpenClaw for conversational processing + UserRegistry.md update
-            if success {
-                let conversationalResponse = await conversationalBridge.saveConversationConversational(
-                    userId: userId,
-                    transcript: transcript,
-                    durationSeconds: duration,
-                    locationHint: nil
-                )
-
-                if let response = conversationalResponse {
-                    NSLog("[UserRegistry] Conversation saved and notified to OpenClaw: %@", response.conversationId)
-                } else {
-                    NSLog("[UserRegistry] Conversation saved but OpenClaw notification failed")
+                // Log extracted insights
+                if let notes = updateResponse.changes.notesAdded, notes > 0 {
+                    NSLog("[UserRegistry] Added %d notes", notes)
+                }
+                if let skills = updateResponse.changes.skillsMerged, skills > 0 {
+                    NSLog("[UserRegistry] Merged %d skills", skills)
+                }
+                if let interests = updateResponse.changes.interestsMerged, interests > 0 {
+                    NSLog("[UserRegistry] Merged %d interests", interests)
+                }
+                if updateResponse.changes.summaryUpdated == true {
+                    NSLog("[UserRegistry] User summary updated")
                 }
             } else {
-                NSLog("[UserRegistry] Failed to save conversation")
+                NSLog("[UserRegistry] Update from transcript failed (non-blocking)")
+                // Don't retry automatically - user can continue using the app
             }
 
             resetSession()

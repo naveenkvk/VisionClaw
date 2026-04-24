@@ -50,9 +50,26 @@ enum GeminiConfig {
   static var openClawGatewayToken: String { SettingsManager.shared.openClawGatewayToken }
   // Note: openClawClientId removed - device identity now generated cryptographically
 
-  // OpenClaw Conversational API (dual-API architecture)
-  static var openClawConversationalHost: String { Secrets.openClawConversationalHost }
-  static var openClawConversationalPort: Int { Secrets.openClawConversationalPort }
+  // OpenResponses API (unified context/profile management)
+  static var openResponsesHost: String {
+    SettingsManager.shared.openResponsesHost ?? Secrets.openResponsesHost
+  }
+
+  static var openResponsesPort: Int {
+    SettingsManager.shared.openResponsesPort ?? Secrets.openResponsesPort
+  }
+
+  static var openResponsesEndpoint: String {
+    Secrets.openResponsesEndpoint  // Typically not overridden
+  }
+
+  static var isOpenResponsesConfigured: Bool {
+    !openResponsesHost.isEmpty && openResponsesPort > 0
+  }
+
+  // DEPRECATED: Replaced by OpenResponses API
+  // static var openClawConversationalHost: String { Secrets.openClawConversationalHost }
+  // static var openClawConversationalPort: Int { Secrets.openClawConversationalPort }
 
   static func websocketURL() -> URL? {
     guard apiKey != "YOUR_GEMINI_API_KEY" && !apiKey.isEmpty else { return nil }

@@ -16,6 +16,8 @@ final class SettingsManager {
     case speakerOutputEnabled
     case videoStreamingEnabled
     case proactiveNotificationsEnabled
+    case openResponsesHost
+    case openResponsesPort
   }
 
   private init() {}
@@ -57,6 +59,21 @@ final class SettingsManager {
     set { defaults.set(newValue, forKey: Key.openClawGatewayToken.rawValue) }
   }
 
+  // MARK: - OpenResponses
+
+  var openResponsesHost: String? {
+    get { defaults.string(forKey: Key.openResponsesHost.rawValue) }
+    set { defaults.set(newValue, forKey: Key.openResponsesHost.rawValue) }
+  }
+
+  var openResponsesPort: Int? {
+    get {
+      let stored = defaults.integer(forKey: Key.openResponsesPort.rawValue)
+      return stored != 0 ? stored : nil
+    }
+    set { defaults.set(newValue, forKey: Key.openResponsesPort.rawValue) }
+  }
+
   // MARK: - WebRTC
 
   var webrtcSignalingURL: String {
@@ -91,7 +108,7 @@ final class SettingsManager {
     for key in [Key.geminiAPIKey, .geminiSystemPrompt, .openClawHost, .openClawPort,
                 .openClawHookToken, .openClawGatewayToken, .webrtcSignalingURL,
                 .speakerOutputEnabled, .videoStreamingEnabled,
-                .proactiveNotificationsEnabled] {
+                .proactiveNotificationsEnabled, .openResponsesHost, .openResponsesPort] {
       defaults.removeObject(forKey: key.rawValue)
     }
   }
