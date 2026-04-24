@@ -294,6 +294,14 @@ class StreamSessionViewModel: ObservableObject {
     if let gemini = geminiSessionVM {
       let userRegistryBridge = UserRegistryBridge()
       let openResponsesBridge = OpenResponsesBridge()
+
+      // Wire OpenResponses callback for TTS + transcription
+      openResponsesBridge.onResponseReceived = { [weak gemini] response in
+        Task { @MainActor [weak gemini] in
+          gemini?.handleOpenClawResponse(response)
+        }
+      }
+
       let coordinator = UserRegistryCoordinator(
         userRegistryBridge: userRegistryBridge,
         openClawBridge: gemini.openClawBridge,

@@ -69,6 +69,11 @@ struct StreamView: View {
               )
             }
 
+            // OpenClaw response transcription
+            if !geminiVM.openClawTranscript.isEmpty {
+              OpenClawTranscriptView(text: geminiVM.openClawTranscript)
+            }
+
             ToolCallStatusView(status: geminiVM.toolCallStatus)
 
             if geminiVM.isModelSpeaking {
@@ -169,6 +174,38 @@ struct SessionModeIndicator: View {
     .padding(.vertical, 6)
     .background(Color.black.opacity(0.6))
     .cornerRadius(16)
+  }
+}
+
+// OpenClaw response transcription view
+struct OpenClawTranscriptView: View {
+  let text: String
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      HStack {
+        Image(systemName: "brain.head.profile")
+          .font(.system(size: 12))
+          .foregroundColor(.blue)
+        Text("OpenClaw")
+          .font(.caption2)
+          .fontWeight(.semibold)
+          .foregroundColor(.blue)
+      }
+
+      Text(text)
+        .font(.body)
+        .foregroundColor(.white)
+        .multilineTextAlignment(.leading)
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 12)
+    .background(Color.blue.opacity(0.15))
+    .cornerRadius(12)
+    .overlay(
+      RoundedRectangle(cornerRadius: 12)
+        .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+    )
   }
 }
 

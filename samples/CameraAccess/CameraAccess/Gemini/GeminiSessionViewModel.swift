@@ -16,10 +16,12 @@ class GeminiSessionViewModel: ObservableObject {
   @Published var errorMessage: String?
   @Published var userTranscript: String = ""
   @Published var aiTranscript: String = ""
+  @Published var openClawTranscript: String = ""  // OpenClaw responses
   @Published var toolCallStatus: ToolCallStatus = .idle
   @Published var openClawConnectionState: OpenClawConnectionState = .notConfigured
   private let geminiService = GeminiLiveService()
   let openClawBridge = OpenClawBridge()  // Made internal for UserRegistryCoordinator
+  private let ttsManager = TTSManager()  // Text-to-speech for OpenClaw responses
   private var toolCallRouter: ToolCallRouter?
   var userRegistryCoordinator: UserRegistryCoordinator?
   private var fullTranscript: String = ""
@@ -53,6 +55,14 @@ class GeminiSessionViewModel: ObservableObject {
     isGeminiActive = true  // Active in the sense of "app session running", not "Gemini connected"
 
     NSLog("[Gemini] Started PASSIVE mode - listening for wake word")
+
+    // Wire OpenClaw response handling (TTS + transcription)
+    openClawBridge.onResponseReceived = { [weak self] response in
+      guard let self else { return }
+      Task { @MainActor in
+        self.handleOpenClawResponse(response)
+      }
+    }
 
     // Setup audio for wake word detection only
     do {
@@ -257,12 +267,16 @@ class GeminiSessionViewModel: ObservableObject {
     // Transition audio back to wake word mode
     audioManager.transitionToPassiveMode()
 
+    // Stop any ongoing TTS
+    ttsManager.stopSpeaking()
+
     // Clear state
     sessionMode = .passive
     connectionState = .disconnected
     isModelSpeaking = false
     userTranscript = ""
     aiTranscript = ""
+    openClawTranscript = ""
     toolCallStatus = .idle
     fullTranscript = ""
 
@@ -286,6 +300,9 @@ class GeminiSessionViewModel: ObservableObject {
     audioManager.stopWakeWordListening()
     audioManager.stopCapture()
 
+    // Stop TTS
+    ttsManager.stopSpeaking()
+
     // Fully stop session
     isGeminiActive = false
     sessionMode = .passive
@@ -293,6 +310,7 @@ class GeminiSessionViewModel: ObservableObject {
     isModelSpeaking = false
     userTranscript = ""
     aiTranscript = ""
+    openClawTranscript = ""
     toolCallStatus = .idle
     fullTranscript = ""
     bufferedContext.removeAll()
@@ -323,6 +341,32 @@ class GeminiSessionViewModel: ObservableObject {
 
   private func resetSilenceTimer() {
     lastSpeechTime = Date()
+  }
+
+  // MARK: - OpenClaw Response Handling
+
+  func handleOpenClawResponse(_ response: String) {
+    // Display transcription
+    openClawTranscript = response
+    fullTranscript += "OpenClaw: " + response + "\n"
+
+    // Speak via TTS
+    ttsManager.speak(response)
+
+    // Reset silence timer (OpenClaw response counts as activity)
+    if sessionMode == .active {
+      resetSilenceTimer()
+    }
+
+    NSLog("[OpenClaw] Response displayed and spoken: %@", String(response.prefix(100)))
+
+    // Clear transcription after 10 seconds
+    Task { @MainActor in
+      try? await Task.sleep(nanoseconds: 10_000_000_000)
+      if self.openClawTranscript == response {
+        self.openClawTranscript = ""
+      }
+    }
   }
 
   func sendVideoFrameIfThrottled(image: UIImage) {

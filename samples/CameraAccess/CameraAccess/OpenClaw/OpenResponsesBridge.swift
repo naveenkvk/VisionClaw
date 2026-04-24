@@ -13,6 +13,9 @@ class OpenResponsesBridge {
     private let session: URLSession
     private let log = OSLog(subsystem: "com.visionclaw.openresponses", category: "bridge")
 
+    // Callback for spoken responses (for TTS and transcription display)
+    var onResponseReceived: ((String) -> Void)?
+
     // OpenClaw Gateway envelope constants
     private let openClawModel = "openclaw:main"
     private let openClawInstructions = "You are handling a Vision Claw registry operation. Apply the visionclawbridge skill for the input provided."
@@ -194,6 +197,16 @@ class OpenResponsesBridge {
 
             // Special handling for String responses (fetch, register)
             if T.self == String.self {
+                // Try to parse as OpenResponses JSON structure first
+                if let extractedText = extractTextFromResponse(data) {
+                    // Notify callback for TTS + transcription
+                    Task { @MainActor in
+                        self.onResponseReceived?(extractedText)
+                    }
+                    return extractedText as? T
+                }
+
+                // Fallback: return raw string
                 return String(data: data, encoding: .utf8) as? T
             }
 
@@ -206,5 +219,28 @@ class OpenResponsesBridge {
             os_log("Request failed: %@", log: log, type: .error, error.localizedDescription)
             return nil
         }
+    }
+
+    /// Extract text from OpenResponses JSON structure
+    /// Expected format: {"output": [{"content": [{"type": "output_text", "text": "..."}]}]}
+    private func extractTextFromResponse(_ data: Data) -> String? {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let output = json["output"] as? [[String: Any]],
+              let firstOutput = output.first,
+              let content = firstOutput["content"] as? [[String: Any]] else {
+            return nil
+        }
+
+        // Find first output_text content
+        for item in content {
+            if let type = item["type"] as? String,
+               type == "output_text",
+               let text = item["text"] as? String {
+                os_log("[OpenResponses] Extracted text: %@", log: log, type: .info, String(text.prefix(100)))
+                return text
+            }
+        }
+
+        return nil
     }
 }

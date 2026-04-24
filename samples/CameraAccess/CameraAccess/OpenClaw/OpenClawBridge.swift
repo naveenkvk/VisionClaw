@@ -12,6 +12,9 @@ class OpenClawBridge: ObservableObject {
   @Published var lastToolCallStatus: ToolCallStatus = .idle
   @Published var connectionState: OpenClawConnectionState = .notConfigured
 
+  // Callback for OpenClaw responses (for TTS and transcription display)
+  var onResponseReceived: ((String) -> Void)?
+
   private let session: URLSession
   private let pingSession: URLSession
   private var sessionKey: String
@@ -150,10 +153,13 @@ class OpenClawBridge: ObservableObject {
       
       if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
          let url = json["url"] as? String {
-        return .success("Found LinkedIn profile for \(name): \(url)\n\nSent to Telegram ✓")
+        let response = "Found LinkedIn profile for \(name): \(url)\n\nSent to Telegram ✓"
+        onResponseReceived?(response)
+        return .success(response)
       }
-      
+
       let raw = String(data: data, encoding: .utf8) ?? "No result"
+      onResponseReceived?(raw)
       return .success(raw)
     } catch {
       return .failure("LinkedIn finder error: \(error.localizedDescription)")
@@ -230,6 +236,7 @@ class OpenClawBridge: ObservableObject {
         conversationHistory.append(["role": "assistant", "content": content])
         NSLog("[OpenClaw] Agent result: %@", String(content.prefix(200)))
         lastToolCallStatus = .completed(toolName)
+        onResponseReceived?(content)
         return .success(content)
       }
 
@@ -237,6 +244,7 @@ class OpenClawBridge: ObservableObject {
       conversationHistory.append(["role": "assistant", "content": raw])
       NSLog("[OpenClaw] Agent raw: %@", String(raw.prefix(200)))
       lastToolCallStatus = .completed(toolName)
+      onResponseReceived?(raw)
       return .success(raw)
     } catch {
       NSLog("[OpenClaw] Agent error: %@", error.localizedDescription)
