@@ -86,6 +86,8 @@
 	<string>This app uses the microphone to have voice conversations with the AI assistant while streaming from your glasses.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>This app needs access to save photos captured from your glasses.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>VisionClaw uses on-device speech recognition to listen for wake word activation. Audio is only sent to Gemini after you say 'Hey Openclaw'.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

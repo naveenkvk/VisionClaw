@@ -1,6 +1,7 @@
 import AVFoundation
 import Foundation
 import UIKit
+import Speech
 
 class AudioManager {
   var onAudioCaptured: ((Data) -> Void)?
@@ -18,6 +19,11 @@ class AudioManager {
   private var accumulatedData = Data()
   private let minSendBytes = 3200  // 100ms at 16kHz mono Int16 = 1600 frames * 2 bytes
 
+  // Wake word detection
+  private var wakeWordDetector: WakeWordDetector?
+  private var isListeningForWakeWord = false
+  private var isInActiveMode = false
+
   // Notification observers for background resilience
   private var interruptionObserver: NSObjectProtocol?
   private var routeChangeObserver: NSObjectProtocol?
@@ -31,6 +37,73 @@ class AudioManager {
       channels: GeminiConfig.audioChannels,
       interleaved: true
     )!
+  }
+
+  // MARK: - Wake Word Integration
+
+  func setWakeWordDetector(_ detector: WakeWordDetector) {
+    self.wakeWordDetector = detector
+  }
+
+  func startWakeWordListening() throws {
+    guard !isListeningForWakeWord else { return }
+    guard let wakeWordDetector = wakeWordDetector else {
+      NSLog("[Audio] Cannot start wake word - detector not set")
+      return
+    }
+
+    isListeningForWakeWord = true
+    isInActiveMode = false
+
+    NSLog("[Audio] Starting wake word listening")
+    wakeWordDetector.startListening()
+
+    // Start audio engine with lightweight tap for wake word
+    try startCapture()
+  }
+
+  func stopWakeWordListening() {
+    guard isListeningForWakeWord else { return }
+
+    isListeningForWakeWord = false
+    wakeWordDetector?.stopListening()
+
+    NSLog("[Audio] Stopped wake word listening")
+  }
+
+  func transitionToActiveMode() {
+    guard isListeningForWakeWord else { return }
+
+    NSLog("[Audio] Transitioning to ACTIVE mode")
+
+    // Stop wake word listening
+    isListeningForWakeWord = false
+    wakeWordDetector?.stopListening()
+
+    // Mark as active mode
+    isInActiveMode = true
+
+    // Audio engine and tap are already running, just change routing
+    // Clear accumulated audio buffers
+    sendQueue.async {
+      self.accumulatedData = Data()
+    }
+  }
+
+  func transitionToPassiveMode() {
+    guard isInActiveMode else { return }
+
+    NSLog("[Audio] Transitioning to PASSIVE mode")
+
+    // Clear accumulated audio
+    sendQueue.async {
+      self.accumulatedData = Data()
+    }
+
+    // Restart wake word listening
+    isInActiveMode = false
+    isListeningForWakeWord = true
+    wakeWordDetector?.startListening()
   }
 
   func setupAudioSession(useIPhoneMode: Bool = false) throws {
@@ -111,35 +184,43 @@ class AudioManager {
       guard let self else { return }
 
       tapCount += 1
-      let pcmData: Data
 
-      if let converter {
-        let resampleFormat = AVAudioFormat(
-          commonFormat: .pcmFormatFloat32,
-          sampleRate: GeminiConfig.inputAudioSampleRate,
-          channels: GeminiConfig.audioChannels,
-          interleaved: false
-        )!
-        guard let resampled = self.convertBuffer(buffer, using: converter, targetFormat: resampleFormat) else {
-          if tapCount <= 3 { NSLog("[Audio] Resample failed for tap #%d", tapCount) }
-          return
-        }
-        pcmData = self.float32BufferToInt16Data(resampled)
-      } else {
-        pcmData = self.float32BufferToInt16Data(buffer)
-      }
+      // Route audio based on mode
+      if self.isListeningForWakeWord && !self.isInActiveMode {
+        // PASSIVE mode: feed to wake word detector only
+        self.wakeWordDetector?.processAudioBuffer(buffer)
+      } else if self.isInActiveMode {
+        // ACTIVE mode: feed to Gemini (existing logic)
+        let pcmData: Data
 
-      // Accumulate into ~100ms chunks before sending to Gemini
-      self.sendQueue.async {
-        self.accumulatedData.append(pcmData)
-        if self.accumulatedData.count >= self.minSendBytes {
-          let chunk = self.accumulatedData
-          self.accumulatedData = Data()
-          if tapCount <= 3 {
-            NSLog("[Audio] Sending chunk: %d bytes (~%dms)",
-                  chunk.count, chunk.count / 32)  // 16kHz * 2 bytes = 32 bytes/ms
+        if let converter {
+          let resampleFormat = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: GeminiConfig.inputAudioSampleRate,
+            channels: GeminiConfig.audioChannels,
+            interleaved: false
+          )!
+          guard let resampled = self.convertBuffer(buffer, using: converter, targetFormat: resampleFormat) else {
+            if tapCount <= 3 { NSLog("[Audio] Resample failed for tap #%d", tapCount) }
+            return
           }
-          self.onAudioCaptured?(chunk)
+          pcmData = self.float32BufferToInt16Data(resampled)
+        } else {
+          pcmData = self.float32BufferToInt16Data(buffer)
+        }
+
+        // Accumulate into ~100ms chunks before sending to Gemini
+        self.sendQueue.async {
+          self.accumulatedData.append(pcmData)
+          if self.accumulatedData.count >= self.minSendBytes {
+            let chunk = self.accumulatedData
+            self.accumulatedData = Data()
+            if tapCount <= 3 {
+              NSLog("[Audio] Sending chunk: %d bytes (~%dms)",
+                    chunk.count, chunk.count / 32)  // 16kHz * 2 bytes = 32 bytes/ms
+            }
+            self.onAudioCaptured?(chunk)
+          }
         }
       }
     }

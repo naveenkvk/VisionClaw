@@ -21,6 +21,7 @@ import MWDATCamera
 import MWDATCore
 import SwiftUI
 import VideoToolbox
+import Speech
 
 enum StreamingStatus {
   case streaming
@@ -301,6 +302,20 @@ class StreamSessionViewModel: ObservableObject {
       )
       faceDetector.delegate = coordinator
       gemini.userRegistryCoordinator = coordinator
+
+      // NEW: Wake word setup
+      let wakeWordDetector = WakeWordDetector()
+      wakeWordDetector.delegate = gemini
+      gemini.audioManager.setWakeWordDetector(wakeWordDetector)
+
+      // Request speech recognition authorization
+      wakeWordDetector.requestAuthorization { granted in
+        if granted {
+          NSLog("[WakeWord] Authorization granted")
+        } else {
+          NSLog("[WakeWord] Authorization denied - wake word disabled")
+        }
+      }
     }
     camera.faceDetectionManager = faceDetector
 

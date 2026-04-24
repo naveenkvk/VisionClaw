@@ -51,10 +51,14 @@ struct StreamView: View {
           .foregroundColor(.white)
       }
 
-      // Gemini status overlay (top) + speaking indicator
+      // Gemini status overlay (top) + speaking indicator + session mode
       if geminiVM.isGeminiActive {
         VStack {
-          GeminiStatusBar(geminiVM: geminiVM)
+          HStack {
+            GeminiStatusBar(geminiVM: geminiVM)
+            Spacer()
+            SessionModeIndicator(sessionMode: geminiVM.sessionMode)
+          }
           Spacer()
 
           VStack(spacing: 8) {
@@ -146,6 +150,28 @@ struct StreamView: View {
   }
 }
 
+// Session mode indicator
+struct SessionModeIndicator: View {
+  let sessionMode: SessionMode
+
+  var body: some View {
+    HStack(spacing: 8) {
+      Circle()
+        .fill(sessionMode == .active ? Color.green : Color.gray)
+        .frame(width: 12, height: 12)
+
+      Text(sessionMode == .active ? "ACTIVE" : "LISTENING")
+        .font(.caption)
+        .foregroundColor(.white)
+        .fontWeight(.semibold)
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 6)
+    .background(Color.black.opacity(0.6))
+    .cornerRadius(16)
+  }
+}
+
 // Extracted controls for clarity
 struct ControlsView: View {
   @ObservedObject var viewModel: StreamSessionViewModel
@@ -181,12 +207,24 @@ struct ControlsView: View {
           if geminiVM.isGeminiActive {
             geminiVM.stopSession()
           } else {
-            await geminiVM.startSession()
+            await geminiVM.startPassiveMode()
           }
         }
       }
       .opacity(webrtcVM.isActive ? 0.4 : 1.0)
       .disabled(webrtcVM.isActive)
+
+      // Manual activation button (when in passive mode)
+      if geminiVM.isGeminiActive && geminiVM.sessionMode == .passive {
+        CircleButton(
+          icon: "mic.fill",
+          text: "Activate"
+        ) {
+          Task {
+            await geminiVM.activateGeminiSession()
+          }
+        }
+      }
 
       // WebRTC Live Stream button (disabled when Gemini is active — audio conflict)
       CircleButton(
