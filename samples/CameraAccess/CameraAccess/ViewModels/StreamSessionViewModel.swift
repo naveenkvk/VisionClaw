@@ -80,6 +80,10 @@ class StreamSessionViewModel: ObservableObject {
   private var deviceMonitorTask: Task<Void, Never>?
   private var iPhoneCameraManager: IPhoneCameraManager?
 
+  // Face detection for glasses mode
+  private var glassesFaceDetector: FaceDetectionManager?
+  private var glassesUserRegistryCoordinator: UserRegistryCoordinator?
+
   // CPU-based CIContext for rendering decoded pixel buffers in background
   private let cpuCIContext = CIContext(options: [.useSoftwareRenderer: true])
   // VideoDecoder for decompressing HEVC/H.264 frames in background
@@ -164,6 +168,11 @@ class StreamSessionViewModel: ObservableObject {
         if !isInBackground {
           self.backgroundFrameCount = 0
           self.bgDiagLogged = false
+
+          // Process frame for face detection (glasses mode)
+          let sampleBuffer = videoFrame.sampleBuffer
+          self.glassesFaceDetector?.detect(sampleBuffer: sampleBuffer)
+
           if let image = videoFrame.makeUIImage() {
             self.currentVideoFrame = image
             if !self.hasReceivedFirstFrame {
@@ -179,6 +188,10 @@ class StreamSessionViewModel: ObservableObject {
           self.backgroundFrameCount += 1
 
           let sampleBuffer = videoFrame.sampleBuffer
+
+          // Process frame for face detection (glasses mode, background)
+          self.glassesFaceDetector?.detect(sampleBuffer: sampleBuffer)
+
           let hasCompressedData = CMSampleBufferGetDataBuffer(sampleBuffer) != nil
 
           if hasCompressedData {
@@ -258,7 +271,45 @@ class StreamSessionViewModel: ObservableObject {
   }
 
   func startSession() async {
+    // Set up face detection for glasses mode
+    setupGlassesFaceDetection()
+
     await streamSession.start()
+  }
+
+  private func setupGlassesFaceDetection() {
+    guard let gemini = geminiSessionVM else {
+      NSLog("[Stream] Cannot setup face detection - Gemini VM not available")
+      return
+    }
+
+    // Initialize face detection & user registry for glasses mode
+    let faceDetector = FaceDetectionManager()
+    let userRegistryBridge = UserRegistryBridge()
+    let openResponsesBridge = OpenResponsesBridge()
+
+    // Wire OpenResponses callback for TTS + transcription
+    openResponsesBridge.onResponseReceived = { [weak gemini] response in
+      Task { @MainActor [weak gemini] in
+        gemini?.handleOpenClawResponse(response)
+      }
+    }
+
+    let coordinator = UserRegistryCoordinator(
+      userRegistryBridge: userRegistryBridge,
+      openClawBridge: gemini.openClawBridge,
+      openResponsesBridge: openResponsesBridge,
+      gemini: gemini
+    )
+
+    faceDetector.delegate = coordinator
+    gemini.userRegistryCoordinator = coordinator
+
+    // Store references
+    self.glassesFaceDetector = faceDetector
+    self.glassesUserRegistryCoordinator = coordinator
+
+    NSLog("[Stream] Face detection setup complete for glasses mode")
   }
 
   private func showError(_ message: String) {
@@ -271,6 +322,11 @@ class StreamSessionViewModel: ObservableObject {
       stopIPhoneSession()
       return
     }
+
+    // Clean up glasses face detection
+    glassesFaceDetector = nil
+    glassesUserRegistryCoordinator = nil
+
     await streamSession.stop()
   }
 
