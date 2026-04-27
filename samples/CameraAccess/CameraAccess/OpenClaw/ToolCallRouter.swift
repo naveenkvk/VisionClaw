@@ -3,12 +3,14 @@ import Foundation
 @MainActor
 class ToolCallRouter {
   private let bridge: OpenClawBridge
+  private weak var geminiViewModel: GeminiSessionViewModel?
   private var inFlightTasks: [String: Task<Void, Never>] = [:]
   private var consecutiveFailures = 0
   private let maxConsecutiveFailures = 3
 
-  init(bridge: OpenClawBridge) {
+  init(bridge: OpenClawBridge, geminiViewModel: GeminiSessionViewModel? = nil) {
     self.bridge = bridge
+    self.geminiViewModel = geminiViewModel
   }
 
   /// Route a tool call from Gemini to OpenClaw. Calls sendResponse with the
@@ -54,6 +56,12 @@ class ToolCallRouter {
 
       NSLog("[ToolCall] Result for %@ (id: %@): %@",
             callName, callId, String(describing: result))
+
+      // Inject text for immediate speech
+      if let speakableText = self.extractSpeakableText(from: result) {
+        NSLog("[ToolCall] Injecting speakable text: \(String(speakableText.prefix(100)))")
+        self.geminiViewModel?.injectAgentResponse(speakableText)
+      }
 
       let response = self.buildToolResponse(callId: callId, name: callName, result: result)
       sendResponse(response)
@@ -104,5 +112,53 @@ class ToolCallRouter {
         ]
       ]
     ]
+  }
+
+  // MARK: - Speech Injection
+
+  /// Extract speakable text from tool result for immediate speech
+  /// Returns nil for errors, pure JSON, or empty responses
+  private func extractSpeakableText(from result: ToolResult) -> String? {
+    guard case .success(let content) = result else {
+      // Don't speak errors - they're shown in UI only
+      return nil
+    }
+
+    var text = content.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    // Skip empty responses
+    guard !text.isEmpty else { return nil }
+
+    // Try to extract message from JSON responses
+    if text.hasPrefix("{") || text.hasPrefix("[") {
+      if let data = text.data(using: .utf8),
+         let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+        // Try common message fields
+        if let message = json["message"] as? String {
+          text = message
+        } else if let result = json["result"] as? String {
+          text = result
+        } else if let content = json["content"] as? String {
+          text = content
+        } else {
+          // Pure JSON with no human-readable field - skip
+          return nil
+        }
+      }
+    }
+
+    // Clean markdown formatting
+    text = text.replacingOccurrences(of: "**", with: "")
+    text = text.replacingOccurrences(of: "__", with: "")
+    text = text.replacingOccurrences(of: "`", with: "")
+
+    // Truncate to prevent speech flooding
+    let maxLength = 500
+    if text.count > maxLength {
+      let index = text.index(text.startIndex, offsetBy: maxLength)
+      text = String(text[..<index]) + "..."
+    }
+
+    return text
   }
 }

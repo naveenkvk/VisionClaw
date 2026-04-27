@@ -189,6 +189,11 @@ class UserRegistryCoordinator: FaceDetectionDelegate {
         }
 
         NSLog("[UserRegistry] Injecting context: \(context)")
+
+        // Inject for immediate speech output
+        gemini.injectAgentResponse(context)
+
+        // Also inject as system context for conversation history
         gemini.injectSystemContext(context)
     }
 

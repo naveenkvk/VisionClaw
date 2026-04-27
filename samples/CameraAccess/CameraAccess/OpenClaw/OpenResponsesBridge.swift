@@ -194,6 +194,19 @@ class OpenResponsesBridge {
 
             // Special handling for String responses (fetch, register)
             if T.self == String.self {
+                // Parse JSON to extract text from output[0].content[0].text
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let output = json["output"] as? [[String: Any]],
+                   let firstOutput = output.first,
+                   let content = firstOutput["content"] as? [[String: Any]],
+                   let firstContent = content.first,
+                   let text = firstContent["text"] as? String {
+                    os_log("Extracted text from response: %@", log: log, type: .debug, String(text.prefix(100)))
+                    return text as? T
+                }
+
+                // Fallback: return raw string if extraction fails
+                os_log("Failed to extract text from JSON, returning raw response", log: log, type: .error)
                 return String(data: data, encoding: .utf8) as? T
             }
 

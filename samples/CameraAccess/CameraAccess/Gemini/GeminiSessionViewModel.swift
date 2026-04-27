@@ -93,7 +93,7 @@ class GeminiSessionViewModel: ObservableObject {
     openClawBridge.resetSession()
 
     // Wire tool call handling
-    toolCallRouter = ToolCallRouter(bridge: openClawBridge)
+    toolCallRouter = ToolCallRouter(bridge: openClawBridge, geminiViewModel: self)
 
     geminiService.onToolCall = { [weak self] toolCall in
       guard let self else { return }
@@ -222,6 +222,31 @@ class GeminiSessionViewModel: ObservableObject {
     ]
 
     // Send via the public API
+    geminiService.sendClientContent(content)
+  }
+
+  /// Inject agent response text for immediate speech output
+  /// Unlike injectSystemContext, this sends raw text without wrapper
+  func injectAgentResponse(_ text: String) {
+    guard isGeminiActive, connectionState == .ready else {
+      NSLog("[Gemini] Cannot inject agent response, session not ready")
+      return
+    }
+
+    NSLog("[Gemini] Injecting agent response for speech: \(text)")
+
+    // Send as a user turn for Gemini to respond to
+    let content: [String: Any] = [
+      "turns": [
+        [
+          "role": "user",
+          "parts": [
+            ["text": text]
+          ]
+        ]
+      ]
+    ]
+
     geminiService.sendClientContent(content)
   }
 
