@@ -23,7 +23,7 @@ class OpenResponsesBridge {
 
     init() {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 30  // 30s timeout for AI processing
+        config.timeoutIntervalForRequest = 90  // 30s timeout for AI processing
         self.session = URLSession(configuration: config)
     }
 

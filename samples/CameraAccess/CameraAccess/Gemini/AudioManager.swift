@@ -24,6 +24,10 @@ class AudioManager {
   private var isListeningForWakeWord = false
   private var isInActiveMode = false
 
+  // Local transcription (passive mode)
+  var localTranscription: LocalTranscriptionManager?
+  private var isTranscribingLocally = false
+
   // Notification observers for background resilience
   private var interruptionObserver: NSObjectProtocol?
   private var routeChangeObserver: NSObjectProtocol?
@@ -104,6 +108,49 @@ class AudioManager {
     isInActiveMode = false
     isListeningForWakeWord = true
     wakeWordDetector?.startListening()
+
+    // Start local transcription if manager is available
+    if let transcription = localTranscription {
+      do {
+        try transcription.startTranscribing()
+        isTranscribingLocally = true
+        NSLog("[Audio] Started local transcription in passive mode")
+      } catch {
+        NSLog("[Audio] Failed to start local transcription: %@", error.localizedDescription)
+      }
+    }
+  }
+
+  // MARK: - Local Transcription Control
+
+  func startLocalTranscription() {
+    guard let transcription = localTranscription else {
+      NSLog("[Audio] Cannot start transcription - manager not set")
+      return
+    }
+
+    do {
+      try transcription.startTranscribing()
+      isTranscribingLocally = true
+      NSLog("[Audio] Started local transcription")
+    } catch {
+      NSLog("[Audio] Failed to start local transcription: %@", error.localizedDescription)
+    }
+  }
+
+  func stopLocalTranscription() -> String {
+    guard isTranscribingLocally, let transcription = localTranscription else {
+      return ""
+    }
+
+    isTranscribingLocally = false
+    let finalTranscript = transcription.stopTranscribing()
+    NSLog("[Audio] Stopped local transcription (captured %d chars)", finalTranscript.count)
+    return finalTranscript
+  }
+
+  func getLocalTranscript() -> String {
+    return localTranscription?.getCurrentTranscript() ?? ""
   }
 
   func setupAudioSession(useIPhoneMode: Bool = false) throws {
@@ -187,8 +234,13 @@ class AudioManager {
 
       // Route audio based on mode
       if self.isListeningForWakeWord && !self.isInActiveMode {
-        // PASSIVE mode: feed to wake word detector only
+        // PASSIVE mode: feed to wake word detector AND local transcription
         self.wakeWordDetector?.processAudioBuffer(buffer)
+
+        // Also feed to local transcription if enabled
+        if self.isTranscribingLocally {
+          self.localTranscription?.processAudioBuffer(buffer)
+        }
       } else if self.isInActiveMode {
         // ACTIVE mode: feed to Gemini (existing logic)
         let pcmData: Data

@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		41588AB92F9C07BE004F6D71 /* WakeWordDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41588AB82F9C07BE004F6D71 /* WakeWordDetector.swift */; };
 		41588ABA2F9C07BE004F6D71 /* WakeWordDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41588AB82F9C07BE004F6D71 /* WakeWordDetector.swift */; };
+		41588AEC2F9FF6FA004F6D71 /* LocalTranscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41588AEB2F9FF6FA004F6D71 /* LocalTranscriptionManager.swift */; };
+		41588B052FA14F4E004F6D71 /* FaceNetModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41588B042FA14F4E004F6D71 /* FaceNetModel.swift */; };
 		41E0D1AC2F9485E0006EA230 /* FaceDetectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41E0D1A92F9485E0006EA230 /* FaceDetectionManager.swift */; };
 		41E0D1AD2F9485E0006EA230 /* FaceDetectionResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41E0D1AA2F9485E0006EA230 /* FaceDetectionResult.swift */; };
 		41E0D1B22F9485F0006EA230 /* UserRegistryBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41E0D1AE2F9485F0006EA230 /* UserRegistryBridge.swift */; };
@@ -88,6 +90,8 @@
 /* Begin PBXFileReference section */
 		3A3A3A3A3A3A3A3A3A3A3A3A /* CameraAccess.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CameraAccess.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		41588AB82F9C07BE004F6D71 /* WakeWordDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakeWordDetector.swift; sourceTree = "<group>"; };
+		41588AEB2F9FF6FA004F6D71 /* LocalTranscriptionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTranscriptionManager.swift; sourceTree = "<group>"; };
+		41588B042FA14F4E004F6D71 /* FaceNetModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceNetModel.swift; sourceTree = "<group>"; };
 		41E0D1A92F9485E0006EA230 /* FaceDetectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceDetectionManager.swift; sourceTree = "<group>"; };
 		41E0D1AA2F9485E0006EA230 /* FaceDetectionResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceDetectionResult.swift; sourceTree = "<group>"; };
 		41E0D1AE2F9485F0006EA230 /* UserRegistryBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserRegistryBridge.swift; sourceTree = "<group>"; };
@@ -165,6 +169,7 @@
 		41E0D1AB2F9485E0006EA230 /* FaceDetection */ = {
 			isa = PBXGroup;
 			children = (
+				41588B042FA14F4E004F6D71 /* FaceNetModel.swift */,
 				41E0D1A92F9485E0006EA230 /* FaceDetectionManager.swift */,
 				41E0D1AA2F9485E0006EA230 /* FaceDetectionResult.swift */,
 			);
@@ -312,6 +317,7 @@
 			children = (
 				A1B2C3D42F0A000100000003 /* AudioManager.swift */,
 				A1B2C3D42F0A000100000001 /* GeminiConfig.swift */,
+				41588AEB2F9FF6FA004F6D71 /* LocalTranscriptionManager.swift */,
 				A1B2C3D42F0A000100000002 /* GeminiLiveService.swift */,
 				A1B2C3D42F0A000100000004 /* GeminiSessionViewModel.swift */,
 			);
@@ -458,6 +464,7 @@
 				41E0D1B22F9485F0006EA230 /* UserRegistryBridge.swift in Sources */,
 				41588ABA2F9C07BE004F6D71 /* WakeWordDetector.swift in Sources */,
 				41E0D1B32F9485F0006EA230 /* UserRegistryCoordinator.swift in Sources */,
+				41588AEC2F9FF6FA004F6D71 /* LocalTranscriptionManager.swift in Sources */,
 				41E0D1B42F9485F0006EA230 /* UserRegistryModels.swift in Sources */,
 				8FD96B872E6F0A9800F56AB1 /* StreamSessionViewModel.swift in Sources */,
 				9DD6CC002F4A000000ED7098 /* VideoDecoder.swift in Sources */,
@@ -473,6 +480,7 @@
 				E66D30242E7DA71900470B48 /* MockDeviceKitButton.swift in Sources */,
 				9DD895962F405E0E0090B9B9 /* RTCVideoView.swift in Sources */,
 				9DD895972F405E0E0090B9B9 /* PiPVideoView.swift in Sources */,
+				41588B052FA14F4E004F6D71 /* FaceNetModel.swift in Sources */,
 				8F8F00782E8ACB4600A4BDAF /* WearablesViewModel.swift in Sources */,
 				E6A188482EB918740097D0E1 /* StreamView.swift in Sources */,
 				8FFD5FF52E8422580035E446 /* CircleButton.swift in Sources */,

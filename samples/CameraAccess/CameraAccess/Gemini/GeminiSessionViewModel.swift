@@ -17,6 +17,7 @@ class GeminiSessionViewModel: ObservableObject {
   @Published var userTranscript: String = ""
   @Published var aiTranscript: String = ""
   @Published var openClawTranscript: String = ""  // OpenClaw responses
+  @Published var passiveTranscript: String = ""  // Live passive mode transcript
   @Published var toolCallStatus: ToolCallStatus = .idle
   @Published var openClawConnectionState: OpenClawConnectionState = .notConfigured
   private let geminiService = GeminiLiveService()
@@ -26,6 +27,7 @@ class GeminiSessionViewModel: ObservableObject {
   var userRegistryCoordinator: UserRegistryCoordinator?
   private var fullTranscript: String = ""
   let audioManager = AudioManager()  // Made internal for wake word integration
+  private let localTranscription = LocalTranscriptionManager()  // Independent speech recognition
   // WebSocket removed - using HTTP-only architecture
   private var lastVideoFrameTime: Date = .distantPast
   private var stateObservation: Task<Void, Never>?
@@ -64,10 +66,34 @@ class GeminiSessionViewModel: ObservableObject {
       }
     }
 
-    // Setup audio for wake word detection only
+    // Setup audio for wake word detection AND local transcription
+    // Wire local transcription to audio manager
+    audioManager.localTranscription = localTranscription
+
+    // Set up transcription callback for passive mode
+    localTranscription.onTranscriptionUpdate = { [weak self] transcript in
+      Task { @MainActor in
+        guard let self, self.sessionMode == .passive else { return }
+        // Update both live display and full transcript
+        self.passiveTranscript = transcript
+        self.fullTranscript = "User (passive): " + transcript
+        NSLog("[LocalTranscript] Captured: %@", String(transcript.prefix(50)))
+      }
+    }
+
+    // Set up partial result callback for real-time updates
+    localTranscription.onPartialResult = { [weak self] partialText in
+      Task { @MainActor in
+        guard let self, self.sessionMode == .passive else { return }
+        // Show partial results in real-time
+        self.passiveTranscript = partialText + "..."
+      }
+    }
+
     do {
       try audioManager.setupAudioSession(useIPhoneMode: streamingMode == .iPhone)
       try audioManager.startWakeWordListening()
+      audioManager.startLocalTranscription()  // Start local transcription in passive mode
     } catch {
       errorMessage = "Audio setup failed: \(error.localizedDescription)"
       isGeminiActive = false
@@ -88,6 +114,17 @@ class GeminiSessionViewModel: ObservableObject {
 
     NSLog("[Gemini] Activating Gemini session...")
     sessionMode = .active
+
+    // Stop local transcription before transitioning to active mode
+    // (Gemini provides transcription in active mode)
+    let capturedPassiveText = audioManager.stopLocalTranscription()
+    if !capturedPassiveText.isEmpty {
+      fullTranscript = "User (passive): " + capturedPassiveText + "\n"
+      NSLog("[Gemini] Captured passive transcript before activation: %d chars", capturedPassiveText.count)
+    }
+
+    // Clear passive transcript display (now showing Gemini transcripts)
+    passiveTranscript = ""
 
     // Transition audio from wake word to Gemini streaming
     audioManager.transitionToActiveMode()
@@ -264,7 +301,7 @@ class GeminiSessionViewModel: ObservableObject {
     stateObservation?.cancel()
     stateObservation = nil
 
-    // Transition audio back to wake word mode
+    // Transition audio back to wake word mode (includes restarting local transcription)
     audioManager.transitionToPassiveMode()
 
     // Stop any ongoing TTS
@@ -277,6 +314,7 @@ class GeminiSessionViewModel: ObservableObject {
     userTranscript = ""
     aiTranscript = ""
     openClawTranscript = ""
+    passiveTranscript = ""
     toolCallStatus = .idle
     fullTranscript = ""
 
@@ -291,9 +329,21 @@ class GeminiSessionViewModel: ObservableObject {
   }
 
   func stopSession() {
-    // If in ACTIVE mode, deactivate first
-    if sessionMode == .active {
+    // Capture mode BEFORE deactivating (deactivate changes mode to passive)
+    let wasInActiveMode = (sessionMode == .active)
+
+    // If in ACTIVE mode, deactivate first (handles transcript saving)
+    if wasInActiveMode {
       deactivateGeminiSession()
+    } else {
+      // If in PASSIVE mode, capture and save local transcript
+      let capturedPassiveText = audioManager.stopLocalTranscription()
+      if !capturedPassiveText.isEmpty {
+        userRegistryCoordinator?.endSession(transcript: capturedPassiveText)
+        NSLog("[Gemini] Saved passive transcript on session stop: %d chars", capturedPassiveText.count)
+      } else {
+        NSLog("[Gemini] No passive transcript to save (0 chars)")
+      }
     }
 
     // Stop wake word listening
@@ -311,6 +361,7 @@ class GeminiSessionViewModel: ObservableObject {
     userTranscript = ""
     aiTranscript = ""
     openClawTranscript = ""
+    passiveTranscript = ""
     toolCallStatus = .idle
     fullTranscript = ""
     bufferedContext.removeAll()

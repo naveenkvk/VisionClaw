@@ -62,7 +62,13 @@ struct StreamView: View {
           Spacer()
 
           VStack(spacing: 8) {
-            if !geminiVM.userTranscript.isEmpty || !geminiVM.aiTranscript.isEmpty {
+            // Passive mode: show live passive transcript
+            if geminiVM.sessionMode == .passive && !geminiVM.passiveTranscript.isEmpty {
+              PassiveTranscriptView(text: geminiVM.passiveTranscript)
+            }
+
+            // Active mode: show user/AI conversation
+            if geminiVM.sessionMode == .active && (!geminiVM.userTranscript.isEmpty || !geminiVM.aiTranscript.isEmpty) {
               TranscriptView(
                 userText: geminiVM.userTranscript,
                 aiText: geminiVM.aiTranscript
@@ -205,6 +211,40 @@ struct OpenClawTranscriptView: View {
     .overlay(
       RoundedRectangle(cornerRadius: 12)
         .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+    )
+  }
+}
+
+// Passive mode live transcript view
+struct PassiveTranscriptView: View {
+  let text: String
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      HStack(spacing: 6) {
+        Circle()
+          .fill(Color.gray)
+          .frame(width: 8, height: 8)
+        Text("Listening...")
+          .font(.caption)
+          .foregroundColor(.gray)
+          .fontWeight(.medium)
+      }
+
+      Text(text)
+        .font(.system(size: 16))
+        .foregroundColor(.white.opacity(0.9))
+        .multilineTextAlignment(.leading)
+        .lineLimit(5)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.horizontal, 16)
+    .padding(.vertical, 12)
+    .background(Color.black.opacity(0.7))
+    .cornerRadius(12)
+    .overlay(
+      RoundedRectangle(cornerRadius: 12)
+        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
     )
   }
 }

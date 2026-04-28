@@ -55,9 +55,12 @@ class UserRegistryCoordinator: FaceDetectionDelegate {
         NSLog("[UserRegistry] Processing face detection...")
 
         // Step 1: Face lookup via User Registry (direct, unchanged)
+        // Lower threshold = stricter matching (0.15 means max cosine distance of 0.15)
+        // Note: Even with strict threshold, landmark-based embeddings aren't distinctive enough
+        // TODO: Replace with proper face recognition model (FaceNet/ArcFace)
         guard let lookupResponse = await userRegistryBridge.searchFace(
             embedding: result.embedding,
-            threshold: 0.4
+            threshold: 0.15
         ) else {
             NSLog("[UserRegistry] Direct lookup failed")
             return
@@ -139,10 +142,23 @@ class UserRegistryCoordinator: FaceDetectionDelegate {
         currentUserName = nil  // Will be set when user identifies themselves
         sessionStartTime = Date()
 
-        // Step 2: Register profile via OpenResponses (minimal profile initially)
+        // Step 2: Register profile via OpenResponses (with placeholder name)
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let profile = UserProfile(
+            name: "Person",  // Placeholder until user identifies themselves
+            role: nil,
+            keySkills: nil,
+            interests: nil,
+            notes: "Registered via Ray-Ban Meta glasses",
+            metadata: [
+                "source": "mediapipe",
+                "registered_at": timestamp
+            ]
+        )
+
         if let welcomeMessage = await openResponsesBridge.registerUser(
             userId: data.userId,
-            profile: UserProfile.minimal()
+            profile: profile
         ) {
             injectContextIntoGemini(welcomeMessage)
             NSLog("[UserRegistry] New user registered with welcome: %@", data.userId)

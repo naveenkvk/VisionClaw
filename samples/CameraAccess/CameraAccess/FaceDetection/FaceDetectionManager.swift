@@ -14,6 +14,9 @@ class FaceDetectionManager {
     private var lastFaceSeenTime: Date?
     private var lossCheckTimer: DispatchSourceTimer?
 
+    // FaceNet model for real face recognition
+    private let faceNetModel: FaceNetModel
+
     // MARK: - Configuration
     private let debounceInterval: TimeInterval = 3.0  // 3 seconds
     private let lossInterval: TimeInterval = 5.0      // 5 seconds
@@ -22,12 +25,13 @@ class FaceDetectionManager {
 
     // MARK: - Initialization
     init() {
+        self.faceNetModel = FaceNetModel()
         setupDetector()
         startLossMonitoring()
     }
 
     private func setupDetector() {
-        NSLog("[FaceDetection] Initialized (using Vision framework for face detection)")
+        NSLog("[FaceDetection] Initialized with FaceNet-128 model for face recognition")
     }
 
     // MARK: - Detection Entry Point
@@ -62,6 +66,7 @@ class FaceDetectionManager {
             return
         }
 
+        // Step 1: Detect face using Vision framework
         let request = VNDetectFaceRectanglesRequest { [weak self] request, error in
             guard let self = self else { return }
 
@@ -82,9 +87,23 @@ class FaceDetectionManager {
                 return
             }
 
-            // Extract embedding from face observation
-            let embedding = self.extractEmbedding(from: observation)
             let bbox = observation.boundingBox
+
+            // Step 2: Crop face image for FaceNet
+            guard let faceImage = self.cropFaceImage(from: sampleBuffer, bbox: bbox) else {
+                NSLog("[FaceDetection] Failed to crop face image")
+                return
+            }
+
+            // Step 3: Extract embedding using FaceNet
+            guard let embedding = self.faceNetModel.extractEmbedding(from: faceImage) else {
+                NSLog("[FaceDetection] FaceNet embedding extraction failed")
+                return
+            }
+
+            NSLog("[FaceDetection] FaceNet embedding extracted: %d dimensions", embedding.count)
+
+            // Step 4: Create snapshot (JPEG for storage)
             let snapshotJPEG = self.cropAndCompress(sampleBuffer: sampleBuffer, bbox: bbox)
 
             let detectionResult = FaceDetectionResult(
@@ -99,7 +118,7 @@ class FaceDetectionManager {
             self.lastDetectionTime = timestamp
             self.lastFaceSeenTime = timestamp
 
-            NSLog("[FaceDetection] Face detected, confidence: %.2f", observation.confidence)
+            NSLog("[FaceDetection] Face detected with FaceNet, confidence: %.2f", observation.confidence)
 
             // Notify delegate on main thread
             DispatchQueue.main.async { [weak self] in
@@ -117,43 +136,29 @@ class FaceDetectionManager {
         }
     }
 
-    private func extractEmbedding(from observation: VNFaceObservation) -> [Float] {
-        // Generate a deterministic embedding from face observation properties
-        // Uses bounding box, yaw, roll, pitch angles as features normalized to 128 dimensions
-        var embedding: [Float] = []
+    /// Crop face region from sample buffer and convert to UIImage
+    private func cropFaceImage(from sampleBuffer: CMSampleBuffer, bbox: CGRect) -> UIImage? {
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return nil }
 
-        let bbox = observation.boundingBox
-        let bboxFeatures: [Float] = [
-            Float(bbox.origin.x),
-            Float(bbox.origin.y),
-            Float(bbox.width),
-            Float(bbox.height),
-            Float(bbox.midX),
-            Float(bbox.midY)
-        ]
+        let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+        let context = CIContext()
 
-        // Add face angle estimates (normalized to -1...1 range)
-        let yaw = Float(observation.yaw?.floatValue ?? 0) / .pi
-        let roll = Float(observation.roll?.floatValue ?? 0) / .pi
-        let pitch = Float(observation.pitch?.floatValue ?? 0) / .pi
+        // Convert normalized bbox to pixel coordinates
+        let imageSize = ciImage.extent.size
+        let cropRect = CGRect(
+            x: bbox.origin.x * imageSize.width,
+            y: bbox.origin.y * imageSize.height,
+            width: bbox.width * imageSize.width,
+            height: bbox.height * imageSize.height
+        )
 
-        embedding.append(contentsOf: bboxFeatures)
-        embedding.append(contentsOf: [yaw, roll, pitch])
+        // Crop and convert to CGImage
+        let croppedImage = ciImage.cropped(to: cropRect)
+        guard let cgImage = context.createCGImage(croppedImage, from: croppedImage.extent) else { return nil }
 
-        // Pad with deterministic values based on observation confidence
-        // This ensures the same face produces similar embeddings
-        let confidence = Float(observation.confidence)
-        while embedding.count < 128 {
-            embedding.append(confidence - Float(embedding.count) / 128.0)
-        }
-
-        // Normalize to 128 dimensions exactly
-        if embedding.count > 128 {
-            embedding = Array(embedding.prefix(128))
-        }
-
-        return embedding
+        return UIImage(cgImage: cgImage)
     }
+
 
     private func cropAndCompress(sampleBuffer: CMSampleBuffer, bbox: CGRect) -> Data? {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return nil }

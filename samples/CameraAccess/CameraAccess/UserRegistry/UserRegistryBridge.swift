@@ -15,7 +15,7 @@ class UserRegistryBridge {
 
     // MARK: - Public API (matches wire contracts from CLAUDE.md Section 4)
 
-    func searchFace(embedding: [Float], threshold: Float = 0.6) async -> FaceLookupResponse? {
+    func searchFace(embedding: [Float], threshold: Float = 0.15) async -> FaceLookupResponse? {
         guard let url = buildURL(path: "/faces/search") else { return nil }
 
         let body: [String: Any] = [
