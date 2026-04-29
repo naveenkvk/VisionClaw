@@ -9,6 +9,14 @@ This document is the single source of truth for the entire User Registry system.
 
 When working on a specific component, focus on the section relevant to that component, but always read Sections 1 through 4 first to understand the system as a whole. Every component must implement its contracts exactly as specified so the pieces integrate without surprises.
 
+## General Working Principles
+
+**IMPORTANT - Documentation Policy:**
+- **DO NOT** create documentation files (`.md`, `README`, etc.) for routine tasks, bug fixes, or minor changes
+- **ONLY** create documentation when explicitly requested by the user
+- Save tokens by providing concise verbal summaries instead of generating markdown files
+- Exception: Critical architectural changes may warrant documentation, but ask first
+
 ---
 
 ## Table of Contents

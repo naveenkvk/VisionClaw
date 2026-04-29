@@ -7,40 +7,51 @@ import UIKit
 /// Produces 128-dimensional face embeddings for recognition
 class FaceNetModel {
     private var model: VNCoreMLModel?
-    private let modelInputSize = CGSize(width: 160, height: 160)
+    private let modelInputSize = CGSize(width: 112, height: 112)
 
     init() {
         setupModel()
     }
 
     private func setupModel() {
-        // Try to load the FaceNet CoreML model
-        // Model should be named "FaceNet.mlmodel" and added to Xcode project
-        guard let modelURL = Bundle.main.url(forResource: "FaceNet", withExtension: "mlmodelc") else {
-            NSLog("[FaceNet] ERROR: FaceNet.mlmodelc not found in bundle")
-            NSLog("[FaceNet] Please add FaceNet CoreML model to the project")
+        // Try to load face recognition model (AdaFace or FaceNet)
+        // Try AdaFace first (512-dim), then fall back to FaceNet (128-dim)
+        var modelURL: URL?
+        var modelName: String = "Unknown"
+
+        if let adaFaceURL = Bundle.main.url(forResource: "AdaFace_IR18", withExtension: "mlmodelc") {
+            modelURL = adaFaceURL
+            modelName = "AdaFace_IR18 (512-dim)"
+        } else if let faceNetURL = Bundle.main.url(forResource: "FaceNet", withExtension: "mlmodelc") {
+            modelURL = faceNetURL
+            modelName = "FaceNet (128-dim)"
+        }
+
+        guard let url = modelURL else {
+            NSLog("[FaceNet] ERROR: No face recognition model found in bundle")
+            NSLog("[FaceNet] Please add AdaFace.mlmodel or FaceNet.mlmodel to the project")
             return
         }
 
         do {
-            let mlModel = try MLModel(contentsOf: modelURL)
+            let mlModel = try MLModel(contentsOf: url)
             self.model = try VNCoreMLModel(for: mlModel)
-            NSLog("[FaceNet] Model loaded successfully")
+            NSLog("[FaceNet] Model loaded successfully: %@", modelName)
         } catch {
             NSLog("[FaceNet] Failed to load model: %@", error.localizedDescription)
         }
     }
 
-    /// Extract 128-dimensional face embedding from a face image
-    /// - Parameter faceImage: Cropped face image (will be resized to 160x160)
-    /// - Returns: 128-dimensional float array, or nil if inference fails
+    /// Extract face embedding from a face image (512-dim for AdaFace, 128-dim for FaceNet)
+    /// - Parameter faceImage: Cropped face image (will be resized to 112x112)
+    /// - Returns: Float array of embeddings, or nil if inference fails
     func extractEmbedding(from faceImage: UIImage) -> [Float]? {
         guard let model = model else {
             NSLog("[FaceNet] Model not loaded")
             return nil
         }
 
-        // Resize image to 160x160
+        // Resize image to 112x112
         guard let resizedImage = resize(image: faceImage, to: modelInputSize) else {
             NSLog("[FaceNet] Failed to resize image")
             return nil
@@ -95,9 +106,9 @@ class FaceNetModel {
     private func extractFromMultiArray(_ multiArray: MLMultiArray) -> [Float]? {
         let count = multiArray.count
 
-        // FaceNet should output 128 dimensions
-        guard count == 128 else {
-            NSLog("[FaceNet] Unexpected embedding size: %d (expected 128)", count)
+        // AdaFace outputs 512 dimensions (can also handle 128-dim models)
+        guard count == 512 || count == 128 else {
+            NSLog("[FaceNet] Unexpected embedding size: %d (expected 512 or 128)", count)
             return nil
         }
 
@@ -115,6 +126,7 @@ class FaceNetModel {
             embedding = embedding.map { $0 / magnitude }
         }
 
+        NSLog("[FaceNet] Extracted %d-dimensional embedding", count)
         return embedding
     }
 

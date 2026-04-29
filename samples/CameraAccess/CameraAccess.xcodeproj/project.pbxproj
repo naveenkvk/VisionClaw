@@ -11,6 +11,7 @@
 		41588ABA2F9C07BE004F6D71 /* WakeWordDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41588AB82F9C07BE004F6D71 /* WakeWordDetector.swift */; };
 		41588AEC2F9FF6FA004F6D71 /* LocalTranscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41588AEB2F9FF6FA004F6D71 /* LocalTranscriptionManager.swift */; };
 		41588B052FA14F4E004F6D71 /* FaceNetModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41588B042FA14F4E004F6D71 /* FaceNetModel.swift */; };
+		41588B072FA15394004F6D71 /* AdaFace_IR18.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 41588B062FA15394004F6D71 /* AdaFace_IR18.mlpackage */; };
 		41E0D1AC2F9485E0006EA230 /* FaceDetectionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41E0D1A92F9485E0006EA230 /* FaceDetectionManager.swift */; };
 		41E0D1AD2F9485E0006EA230 /* FaceDetectionResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41E0D1AA2F9485E0006EA230 /* FaceDetectionResult.swift */; };
 		41E0D1B22F9485F0006EA230 /* UserRegistryBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41E0D1AE2F9485F0006EA230 /* UserRegistryBridge.swift */; };
@@ -92,6 +93,7 @@
 		41588AB82F9C07BE004F6D71 /* WakeWordDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakeWordDetector.swift; sourceTree = "<group>"; };
 		41588AEB2F9FF6FA004F6D71 /* LocalTranscriptionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTranscriptionManager.swift; sourceTree = "<group>"; };
 		41588B042FA14F4E004F6D71 /* FaceNetModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceNetModel.swift; sourceTree = "<group>"; };
+		41588B062FA15394004F6D71 /* AdaFace_IR18.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = AdaFace_IR18.mlpackage; sourceTree = "<group>"; };
 		41E0D1A92F9485E0006EA230 /* FaceDetectionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceDetectionManager.swift; sourceTree = "<group>"; };
 		41E0D1AA2F9485E0006EA230 /* FaceDetectionResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceDetectionResult.swift; sourceTree = "<group>"; };
 		41E0D1AE2F9485F0006EA230 /* UserRegistryBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserRegistryBridge.swift; sourceTree = "<group>"; };
@@ -169,6 +171,7 @@
 		41E0D1AB2F9485E0006EA230 /* FaceDetection */ = {
 			isa = PBXGroup;
 			children = (
+				41588B062FA15394004F6D71 /* AdaFace_IR18.mlpackage */,
 				41588B042FA14F4E004F6D71 /* FaceNetModel.swift */,
 				41E0D1A92F9485E0006EA230 /* FaceDetectionManager.swift */,
 				41E0D1AA2F9485E0006EA230 /* FaceDetectionResult.swift */,
@@ -455,6 +458,7 @@
 				9DD6CAAF2F3C426600ED7098 /* Secrets.swift in Sources */,
 				8FFD60342E8434070035E446 /* MediaPickerView.swift in Sources */,
 				9DD6CB0E2F3C64F400ED7098 /* WebRTCOverlayView.swift in Sources */,
+				41588B072FA15394004F6D71 /* AdaFace_IR18.mlpackage in Sources */,
 				8FFD60352E8434070035E446 /* StatusText.swift in Sources */,
 				8FFD602C2E8433E20035E446 /* MockDeviceKitViewModel.swift in Sources */,
 				8FFD602D2E8433E20035E446 /* MockDeviceViewModel.swift in Sources */,

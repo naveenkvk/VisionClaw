@@ -258,7 +258,7 @@ class OpenClawBridge: ObservableObject {
   /// Call lookup_face intent via /api/v1/message endpoint
   func callUserRegistryLookup(
     embedding: [Float],
-    threshold: Float = 0.15
+    threshold: Float = 0.4
   ) async -> ToolResult {
     lastToolCallStatus = .executing("lookup_face")
 

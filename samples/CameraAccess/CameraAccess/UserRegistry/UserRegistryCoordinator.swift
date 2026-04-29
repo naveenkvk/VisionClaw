@@ -55,12 +55,12 @@ class UserRegistryCoordinator: FaceDetectionDelegate {
         NSLog("[UserRegistry] Processing face detection...")
 
         // Step 1: Face lookup via User Registry (direct, unchanged)
-        // Lower threshold = stricter matching (0.15 means max cosine distance of 0.15)
-        // Note: Even with strict threshold, landmark-based embeddings aren't distinctive enough
-        // TODO: Replace with proper face recognition model (FaceNet/ArcFace)
+        // AdaFace 512-dim embeddings are highly distinctive
+        // Threshold 0.7 = allows matching with lighting/angle variations
+        // (0.4 was too strict for real-world iPhone camera conditions)
         guard let lookupResponse = await userRegistryBridge.searchFace(
             embedding: result.embedding,
-            threshold: 0.15
+            threshold: 0.7
         ) else {
             NSLog("[UserRegistry] Direct lookup failed")
             return
