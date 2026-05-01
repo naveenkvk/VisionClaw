@@ -305,11 +305,25 @@ class StreamSessionViewModel: ObservableObject {
     faceDetector.delegate = coordinator
     gemini.userRegistryCoordinator = coordinator
 
+    // Wake word setup for glasses mode (same as iPhone mode)
+    let wakeWordDetector = WakeWordDetector()
+    wakeWordDetector.delegate = gemini
+    gemini.audioManager.setWakeWordDetector(wakeWordDetector)
+
+    // Request speech recognition authorization
+    wakeWordDetector.requestAuthorization { granted in
+      if granted {
+        NSLog("[WakeWord] Authorization granted (glasses mode)")
+      } else {
+        NSLog("[WakeWord] Authorization denied - wake word disabled (glasses mode)")
+      }
+    }
+
     // Store references
     self.glassesFaceDetector = faceDetector
     self.glassesUserRegistryCoordinator = coordinator
 
-    NSLog("[Stream] Face detection setup complete for glasses mode")
+    NSLog("[Stream] Face detection and wake word setup complete for glasses mode")
   }
 
   private func showError(_ message: String) {

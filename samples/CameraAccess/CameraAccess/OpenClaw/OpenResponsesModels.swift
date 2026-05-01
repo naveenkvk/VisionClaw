@@ -43,7 +43,7 @@ struct UserProfile: Codable {
             role: nil,
             keySkills: nil,
             interests: nil,
-            notes: "Registered via Ray-Ban Meta glasses",
+            notes: "First meet",
             metadata: [
                 "source": "mediapipe",
                 "registered_at": timestamp

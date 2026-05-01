@@ -149,7 +149,7 @@ class UserRegistryCoordinator: FaceDetectionDelegate {
             role: nil,
             keySkills: nil,
             interests: nil,
-            notes: "Registered via Ray-Ban Meta glasses",
+            notes: "First interaction",
             metadata: [
                 "source": "mediapipe",
                 "registered_at": timestamp

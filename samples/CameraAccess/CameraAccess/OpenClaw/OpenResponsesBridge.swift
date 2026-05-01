@@ -18,8 +18,6 @@ class OpenResponsesBridge {
 
     // OpenClaw Gateway envelope constants
     private let openClawModel = "openclaw:main"
-    private let openClawInstructions = "You are handling a Vision Claw registry operation. Apply the visionclawbridge skill for the input provided."
-    private let openClawUser = "visionclaw-registry"
 
     init() {
         let config = URLSessionConfiguration.default
@@ -138,6 +136,17 @@ class OpenResponsesBridge {
         return "Bearer \(GeminiConfig.openClawGatewayToken)"
     }
 
+    /// Build stage-specific instructions for OpenClaw agent
+    private func buildInstructions(for stage: OpenResponsesStage) -> String {
+        let stageName = stage.rawValue.uppercased()
+        return """
+        You are handling a Vision Claw registry operation via the visionclaw_user_registry skill. \
+        This is a Stage \(stageName) request. Parse the JSON input, confirm source is "visionclaw" \
+        and stage is "\(stage.rawValue)", then execute ONLY the \(stage.rawValue) stage instructions \
+        from the skill. Complete all tool calls before responding.
+        """
+    }
+
     /// Generic POST method supporting different response types
     private func postStage<T: Decodable>(
         stage: OpenResponsesStage,
@@ -161,9 +170,9 @@ class OpenResponsesBridge {
             // Step 2: Wrap in OpenClaw Gateway envelope
             let wrappedPayload: [String: Any] = [
                 "model": openClawModel,
-                "instructions": openClawInstructions,
+                "instructions": buildInstructions(for: stage),
                 "input": innerPayloadString,
-                "user": openClawUser
+                "user": "visionclaw-\(stage.rawValue)"
             ]
 
             // Step 3: Serialize the wrapped payload
@@ -213,7 +222,24 @@ class OpenResponsesBridge {
             // JSON decoding for UpdateResponse
             let decoder = JSONDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase
-            return try decoder.decode(T.self, from: data)
+
+            // First attempt: try direct decode (agent returns bare JSON)
+            if let result = try? decoder.decode(T.self, from: data) {
+                return result
+            }
+
+            // Second attempt: extract from OpenResponses envelope
+            if let extractedText = extractTextFromResponse(data),
+               let jsonData = extractedText.data(using: .utf8),
+               let result = try? decoder.decode(T.self, from: jsonData) {
+                return result
+            }
+
+            // Both attempts failed - log the raw response for debugging
+            os_log("[OpenResponses] Failed to decode %@ response for stage %@. Raw response:\n%@",
+                   log: log, type: .error,
+                   String(describing: T.self), stage.rawValue, responseString)
+            return nil
 
         } catch {
             os_log("Request failed: %@", log: log, type: .error, error.localizedDescription)
